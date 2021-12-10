@@ -2,13 +2,13 @@
 
 You first need to consume Kafka. We will be using a topic from Confluent Cloud, so you will need to pass those parameters to the Consumer:
 
-* bootstrap.servers={{ CLUSTER_ENDPOINT }}
+* bootstrap.servers=$CLUSTER_ENDPOINT
 * security.protocol=SASL_SSL
 * sasl.mechanisms=PLAIN
-* sasl.username={{ CLUSTER_API_KEY }}
-* sasl.password={{ CLUSTER_API_SECRET }}
+* sasl.username=$CLUSTER_API_KEY
+* sasl.password=$CLUSTER_API_SECRET
 
-Don't forget to set a group.id!
+Don't forget to set a group.id for consumption!
 
 ## Topics
 
@@ -30,7 +30,8 @@ The main topic is named "new_user". Here's an example of the JSON pushed:
     "premium": true,
     "credit": -7,
     "time_zone": "Pacific/Pago_Pago",
-    "user_agent": "Mozilla/5.0 (Windows; U; MSIE 9.0; WIndows NT 9.0; en-US))"
+    "user_agent": "Mozilla/5.0 (Windows; U; MSIE 9.0; WIndows NT 9.0; en-US))",
+    "pack": "small"
 }
 ```
 

@@ -43,10 +43,10 @@ We cannot host medical companies. We need to contact if the industry contains wo
 
 ### Team-6
 
-We need more developers: We need to contact if the profession is `architect` or `engineer`.
+We need more developers: We need to contact if the profession is an `engineer`.
 
-* type: "CONTACT_CUSTOMER",
-* reason: "HIRE"
+* type: "HIRE_CUSTOMER",
+* reason: "IS_ENGINEER"
 
 ### Team-7 
 
@@ -85,7 +85,31 @@ We need to provide analytics according to the time_zone. Read 100 messages, and 
 
 ### Team-12
 
+We need more HRs: We need to contact if the profession is an `human resources`.
+
+* type: "HIRE_CUSTOMER",
+* reason: "IS_HR"
+
+### Team-13
+
+We need to check the avatars: we need to contact if the avatar is not from robothash.
+
+* type: "CONTACT_CUSTOMER",
+* reason: "BAD_AVATAR"
+
+### Team-14
+
+We need to check the name: we need to ban the user if it's name is "John Doe".
+
+* type: "BAN_CUSTOMER",
+* reason: "SUSPICIOUS_NAME"
+
+### Team-15
+
+We need to check the pack, we need to send a mail to all `free` pack.
+
+* type: "CONTACT_CUSTOMER",
+* reason: "UPGRADE_FREE"
+
+  
 You can now head to [step 3](/kafka-tutorial/docs/step-3.html)!
-
-
-

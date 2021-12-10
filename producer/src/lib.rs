@@ -25,6 +25,7 @@ struct User {
     credit: i32,
     time_zone: String,
     user_agent: String,
+    pack: String,
 }
 
 impl User {
@@ -33,10 +34,14 @@ impl User {
             email: internet::en::FreeEmail().fake(),
             user_name: internet::en::Username().fake(),
             user_agent: internet::en::UserAgent().fake(),
-            avatar: format!(
-                "https://robohash.org/{}.png?size=50x50",
-                internet::en::Username().fake::<String>()
-            ),
+            avatar: if fake::faker::boolean::en::Boolean(90).fake() {
+                format!(
+                    "https://robohash.org/{}.png?size=50x50",
+                    internet::en::Username().fake::<String>()
+                )
+            } else {
+                String::from("example.org")
+            },
             field: job::en::Field().fake(),
             company_name: company::en::CompanyName().fake(),
             company_slogan: company::en::CatchPhase().fake(),
@@ -45,8 +50,20 @@ impl User {
             premium: fake::faker::boolean::en::Boolean(50).fake(),
             credit: (-20..20).fake::<i32>(),
             time_zone: address::en::TimeZone().fake(),
-            name: name::en::Name().fake(),
+            name: if fake::faker::boolean::en::Boolean(90).fake() {
+                format!(
+                    "{}",
+                    name::en::Name().fake::<String>()
+                )
+            } else {
+                String::from("John Doe")
+            },
             credit_card_number: creditcard::en::CreditCardNumber().fake(),
+            pack: if fake::faker::boolean::en::Boolean(10).fake() {
+                String::from("free")
+            } else {
+                String::from("small")
+            },
         }
     }
 }
