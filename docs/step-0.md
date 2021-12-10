@@ -30,3 +30,4 @@ You can use those librairies to connect to Kafka:
 * [Node client](https://www.npmjs.com/package/kafka-node)
 * [Java client](https://search.maven.org/#artifactdetails%7Corg.apache.kafka%7Ckafka-clients%7C1.1.0%7Cjar)
 
+You can now continue on [step-1](/docs/step-1.md)!
