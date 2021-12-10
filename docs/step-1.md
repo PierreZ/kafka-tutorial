@@ -41,4 +41,4 @@ The main topic is named "new_user". Here's an example of the JSON pushed:
 * print the Kafka message
 * deserialize the Kafka payload in a structure
 
-You can now continue on [step-2](/docs/step-2.md)!
+You can now continue on [step-2](/kafka-tutorial/docs/step-2.html)!

@@ -85,7 +85,7 @@ We need to provide analytics according to the time_zone. Read 100 messages, and 
 
 ### Team-12
 
-You can now head to [step 3](/docs/step-3.md)!
+You can now head to [step 3](/kafka-tutorial/docs/step-3.html)!
 
 
 

@@ -1,7 +1,7 @@
 # kafka-tutorial
 A Kafka tutorial!
 
-I have built this Kafka tutorial as a quick entry point to Kafka.
+I have built this Kafka tutorial as a quick entry point to Kafka. The tutorial is available [here](https://pierrez.github.io/kafka-tutorial/)
 
 > ## Kafka
 > Apache Kafka is an open-source distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications. 
