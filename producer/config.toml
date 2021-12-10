@@ -1,0 +1,5 @@
+interval=1
+topic="test"
+brokers="todo.europe-west1.gcp.confluent.cloud:9092"
+username=""
+password=""
