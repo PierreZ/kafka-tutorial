@@ -8,15 +8,21 @@ The startup is growing fast, so there is a lot of new registrations. Each regist
 
 ## Architecture
 
-Each group will develop an application that will:
+Each team will develop an application that will:
 
 * read Kafka messages,
 * react to the message,
 * write a Kafka message.
 
+This is commonly known as **ETL**:
+
+* **Extract** data,
+* **Transform** data,
+* **Load** data.
+
 The application can be written in any language, but there will be support only in Java, Go, Python or Rust.
 
-A Python dev-environment accessible from any browser can be used by clicking on the following link:
+An online Python environment accessible from any browser can be used by clicking on the following link:
 
 [![Open in GitPod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/PierreZ/kafka-tutorial).
 

@@ -6,6 +6,10 @@ Each team will have a verification to do.
 
 Please remember the information related to your team.
 
+## TODOs
+
+* Filter the users according to your team
+
 ### Team-1
 
 We are receiving a lot of spams from Yahoo. We need to send a verification mail if the `email` field is from yahoo.
@@ -111,4 +115,7 @@ We need to check the pack, we need to send a mail to all `free` pack.
 * type: "CONTACT_CUSTOMER",
 * reason: "UPGRADE_FREE"
   
+## Next step
+
+Congratulations, you learned how to apply a filter on a Kafka stream 🎉
 You can now head to [step 3](/kafka-tutorial/docs/step-3.html)!
