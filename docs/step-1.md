@@ -7,6 +7,8 @@ You first need to consume Kafka. We will be using a topic from Confluent Cloud, 
 * sasl.mechanisms=PLAIN
 * sasl.username=$CLUSTER_API_KEY
 * sasl.password=$CLUSTER_API_SECRET
+* group.id=$TEAM_ID
+* client.id=$TEAM_ID
 
 Don't forget to set a group.id for consumption!
 

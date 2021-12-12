@@ -81,7 +81,7 @@ Due to the frontend stack, we need to warn users if there `user_agent` contains 
 We need to provide analytics according to the time_zone. Read 100 messages, and count how many messages are from Europe. 
 
 * type: "ANALYTICS_TIME_ZONE_EUROPE",
-* reason: "{{ your count as a string }}"
+* reason: "your count as a string"
 
 ### Team-12
 
@@ -110,6 +110,5 @@ We need to check the pack, we need to send a mail to all `free` pack.
 
 * type: "CONTACT_CUSTOMER",
 * reason: "UPGRADE_FREE"
-
   
 You can now head to [step 3](/kafka-tutorial/docs/step-3.html)!

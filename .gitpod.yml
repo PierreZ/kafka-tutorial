@@ -2,6 +2,7 @@ tasks:
   - init: |
       python -m pip install --upgrade pip
       python -m pip install kafka-python
+      python -m pip install pylint
     command: |
       python main.py
 

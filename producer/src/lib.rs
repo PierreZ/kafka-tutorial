@@ -70,7 +70,7 @@ impl User {
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub interval: u64,
+    pub interval_millis: u64,
     pub topic: String,
     pub brokers: String,
     pub username: String,
@@ -100,7 +100,7 @@ pub async fn produce(settings: &Settings) {
         .create()
         .expect("Producer creation error");
 
-    let mut interval = time::interval(Duration::from_secs(settings.interval));
+    let mut interval = time::interval(Duration::from_millis(settings.interval_millis));
 
     loop {
         tokio::select! {

@@ -10,7 +10,8 @@ The topic `action` is the one where you should be pushing data. It will accept d
 {
   "type": "",
   "team": "",
-  "reason": ""
+  "reason": "",
+  "customer": "customer's mail"
 }
 ```
 
@@ -23,3 +24,4 @@ To produce, you will need to set the parameters for the Producer:
 * sasl.mechanisms=PLAIN
 * sasl.username=$CLUSTER_API_KEY
 * sasl.password=$CLUSTER_API_SECRET
+* client.id=$TEAM_ID
