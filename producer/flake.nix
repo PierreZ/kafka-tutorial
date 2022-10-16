@@ -24,6 +24,8 @@
           llvmPackages.libclang
           llvmPackages.libcxxClang
           pkg-config
+          openssl
+          cmake
 
           # Rust part
           cargo-expand

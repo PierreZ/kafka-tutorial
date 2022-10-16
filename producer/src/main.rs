@@ -1,7 +1,7 @@
 use producer::{produce, Settings};
-use simple_logger::SimpleLogger;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "producer")]
@@ -13,7 +13,11 @@ struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    SimpleLogger::new().init().unwrap();
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::from_default_env())
+        .init();
+
     let opt = Opt::from_args();
 
     let settings = Settings::from(opt.config_file.to_str().unwrap())?;

@@ -1,13 +1,13 @@
 use config::{ConfigError, File};
 use fake::faker::{address, company, creditcard, internet, job, name};
 use fake::Fake;
-use log::info;
 use rdkafka::message::OwnedHeaders;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time;
+use tracing::{error, info, trace};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct User {
@@ -51,10 +51,7 @@ impl User {
             credit: (-20..20).fake::<i32>(),
             time_zone: address::en::TimeZone().fake(),
             name: if fake::faker::boolean::en::Boolean(90).fake() {
-                format!(
-                    "{}",
-                    name::en::Name().fake::<String>()
-                )
+                format!("{}", name::en::Name().fake::<String>())
             } else {
                 String::from("John Doe")
             },
@@ -129,12 +126,12 @@ async fn send_message(producer: &FutureProducer, topic_name: &str) {
         )
         .await
     {
-        Ok((partition, offset)) => log::trace!(
+        Ok((partition, offset)) => trace!(
             "pushed message to partition {} at offset {}",
             partition,
             offset
         ),
-        Err((error, message)) => log::error!("error pushing message: {:?}: {:?}", error, message),
+        Err((error, message)) => error!("error pushing message: {:?}: {:?}", error, message),
     };
 }
 #[cfg(test)]

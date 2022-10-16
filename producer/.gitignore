@@ -1,2 +1,4 @@
 target
 confluent.toml
+.direnv
+.idea
