@@ -28,7 +28,7 @@ An online Python environment accessible from any browser can be used by clicking
 
 ## library
 
-You can use those librairies to connect to Kafka:
+You can use those libraries to connect to Kafka:
 
 * [Python client](https://kafka-python.readthedocs.io/en/master/)
 * [Go client](https://github.com/Shopify/sarama)

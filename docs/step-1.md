@@ -15,26 +15,26 @@ You first need to consume Kafka. so the instructor should have displayed:
   * partition,
   * offsets,
   * topic,
-* deserialize the Kafka payload in a structure/JSON
+* deserialize the Kafka payload in a structure/JSON(see below for tips)
 
 ## Consumer's configuration 
 
 We will be using a topic from Confluent Cloud, so you will need to pass those parameters to the Consumer:
 
-* bootstrap.servers=$CLUSTER_ENDPOINT
 * security.protocol=SASL_SSL
 * sasl.mechanisms=PLAIN
-* sasl.username=$CLUSTER_API_KEY
-* sasl.password=$CLUSTER_API_SECRET
-* group.id=$TEAM_ID
-* client.id=$TEAM_ID
+* bootstrap.servers=`the cluster endpoint provided by the instructor`
+* sasl.username=`the api key provided by the instructor`
+* sasl.password=`the api secret provided by the instructor`
+* group.id=`your team ID`
+* client.id=`your team ID`
 
 ⚠️⚠️⚠️ Don't forget to set both a group.id and a client.id for consumption!
 
 ## Topics
 
-### `new_user`
-The main topic is named "new_user". Here's an example of the JSON pushed:
+### `new_users`
+The main topic is named "new_users". Here's an example of the JSON pushed:
 
 ```json
 {
@@ -56,10 +56,15 @@ The main topic is named "new_user". Here's an example of the JSON pushed:
 }
 ```
 
-
 ## Questions before moving on
 
 * how many partitions does the topic `new_users` have?
+
+## Tips
+
+### JSON
+
+In Python, you can use the [json package and the json.loads function](https://docs.python.org/3/library/json.html).
 
 ## Next step
 

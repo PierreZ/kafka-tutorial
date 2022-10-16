@@ -30,12 +30,12 @@ Each team will have to push the corresponding json to the same topic. You need t
 
 To produce, you will need to set the parameters for the Producer:
 
-* bootstrap.servers=$CLUSTER_ENDPOINT
 * security.protocol=SASL_SSL
 * sasl.mechanisms=PLAIN
-* sasl.username=$CLUSTER_API_KEY
-* sasl.password=$CLUSTER_API_SECRET
-* client.id=$TEAM_ID
+* bootstrap.servers=`the cluster endpoint provided by the instructor`
+* sasl.username=`the api key provided by the instructor`
+* sasl.password=`the api secret provided by the instructor`
+* client.id=`your team ID`
   
 ⚠️⚠️⚠️ Don't forget to set a client.id for production!
 
