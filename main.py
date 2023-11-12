@@ -3,7 +3,8 @@ from kafka import KafkaProducer
 from kafka.errors import KafkaError
 import json
 
-CONSUME_TOPIC="new_user"
+CONSUME_TOPIC="new_users"
+PRODUCE_TOPIC="actions"
 
 # You need to change these
 BOOTSTRAP_SERVERS="localhost:9092"
@@ -22,6 +23,5 @@ consumer = KafkaConsumer(CONSUME_TOPIC,
                          bootstrap_servers=BOOTSTRAP_SERVERS)
 
 for message in consumer:
-    print ("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,
-                                          message.offset, message.key,
-                                          message.value))
+    print ("%s:%d:%d: value=%s" % (message.topic, message.partition,
+                                          message.offset, message.value))
