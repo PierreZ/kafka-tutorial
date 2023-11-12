@@ -1,14 +1,11 @@
-# Step-2: Event-driven architecture
+# Step-2: Transform
 
 Not that you have parsed your JSON in a structure, it is time to run some verifications on the users!
 
-Each team will have a verification to do. 
-
-Please remember the information related to your team.
-
 ## TODOs
 
-* Filter the users according to your team
+* Filter the users according to your team's job
+* Keep the `type` and the `reason` describe above, you will need it later!
 
 ### Team-1
 
@@ -52,7 +49,7 @@ We need more developers: We need to contact if the profession is an `engineer`.
 * type: "HIRE_CUSTOMER",
 * reason: "IS_ENGINEER"
 
-### Team-7 
+### Team-7
 
 We need to take care of premium users. We need to contact them if the `premium` is `true`.
 

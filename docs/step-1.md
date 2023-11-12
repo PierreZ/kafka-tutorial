@@ -1,39 +1,11 @@
-# Step 1: Consume Kafka
+# Step 1: Extract
 
-You first need to consume Kafka. so the instructor should have displayed:
+The very first step to do is to connect to Kafka and display all incoming messages. Let's do this!
 
-* cluster endpoint,
-* api key,
-* api secret.
-
-## TODOs 
-
-* Create Consumer with the right parameters(see below)
-* Loop through all messages
-* print the different element of a Kafka message:
-  * value,
-  * partition,
-  * offsets,
-  * topic,
-* deserialize the Kafka payload in a structure/JSON(see below for tips)
-
-## Consumer's configuration 
-
-We will be using a topic from Confluent Cloud, so you will need to pass those parameters to the Consumer:
-
-* security.protocol=SASL_SSL
-* sasl.mechanisms=PLAIN
-* bootstrap.servers=`the cluster endpoint provided by the instructor`
-* sasl.username=`the api key provided by the instructor`
-* sasl.password=`the api secret provided by the instructor`
-* group.id=`your team ID`
-* client.id=`your team ID`
-
-⚠️⚠️⚠️ Don't forget to set both a group.id and a client.id for consumption!
-
-## Topics
+## Topics to read
 
 ### `new_users`
+
 The main topic is named "new_users". Here's an example of the JSON pushed:
 
 ```json
@@ -56,15 +28,23 @@ The main topic is named "new_users". Here's an example of the JSON pushed:
 }
 ```
 
-## Questions before moving on
+## TODOs
+
+### Read Kafka
+
+By loading the GitPod, you should have the boilerplate already setup.
+
+You should be able to run the code by replacing `BOOTSTRAP_SERVERS`, `TEAM_NAME`, `SASL_USERNAME` and `SASL_PASSWORD`. When running the code, you should see the messages.
+
+### Questions
 
 * how many partitions does the topic `new_users` have?
 
-## Tips
+## Parsing the JSON
 
-### JSON
+Now that we are displaying the whole message, we should interpret the `value` of the message. It is a JSON, so in Python, you can use the [json package and the json.loads function](https://docs.python.org/3/library/json.html).
 
-In Python, you can use the [json package and the json.loads function](https://docs.python.org/3/library/json.html).
+To prove that you managed to parse the JSON, try printing only the email.
 
 ## Next step
 

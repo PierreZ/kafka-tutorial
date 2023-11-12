@@ -1,4 +1,4 @@
-# Step-4 Consumer-group and failover
+# Step-4 Scale-up
 
 We are going to simulate the fact that you will need to spawn more instances on your program.
 

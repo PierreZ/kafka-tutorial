@@ -1,47 +1,46 @@
-# Push an action message
+# Step 3: Load
 
-Now that you have a user, we now need to push a message. There is an microservice waiting for actions to do.
+Now that you have detected something, let's notify another app.
 
-## TODOs
+## TODOS
 
-* Create a Producer with the right parameters (see below)
-* serialize the action as a JSON
-* produce a message in the `actions` topic
-* print the resulting offsets/partitions
+### Create a producer
 
-## Topics 
-
-### `actions`
-
-The topic `actions` is the one where you should be pushing data. It will accept data in the JSON format:
-
-```json
-{
-  "type": "",
-  "team": "",
-  "reason": "",
-  "customer": "customer's mail"
-}
-```
-
-## Producer configuration
-
-Each team will have to push the corresponding json to the same topic. You need to use the type and the reason from your team.
+You need to create a [KafkaProducer](https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html) at the top of your code.
 
 To produce, you will need to set the parameters for the Producer:
 
-* security.protocol=SASL_SSL
-* sasl.mechanisms=PLAIN
-* bootstrap.servers=`the cluster endpoint provided by the instructor`
-* sasl.username=`the api key provided by the instructor`
-* sasl.password=`the api secret provided by the instructor`
-* client.id=`your team ID`
-  
-⚠️⚠️⚠️ Don't forget to set a client.id for production!
+* security_protocol=SASL_SSL
+* sasl_mechanism=PLAIN
+* sasl_plain_username="user"
+* sasl_plain_password="toto"
+* bootstrap_servers="localhost:8080"
+* client_id=`your team ID`
 
-## Questions before moving on
+You can reuse the same auth from the consumer.
 
-* how many partitions does the topic `actions` have?
+### Create a message
+
+You need to create a Python dictionary. The dictionary must have these parameters:
+
+| key      | value                    |
+|----------|--------------------------|
+| customer | email of the customer    |
+| type     | the type of your team    |
+| reason   | the reason of your team  |
+| team     | your team                |
+
+Once you have created the dictionary, the JSON can be created with [json.dumps](https://docs.python.org/3/library/json.html).
+
+### Push a message
+
+The topic `actions` is the one where you should be pushing data.
+
+You can use the `send` method from your producer. You will need to convert your data from string to bytes by using `bytes(yourJson, "utf-8")`.
+
+The producer will create a Future. You can find some tips on how to manipulate the Future [here](https://kafka-python.readthedocs.io/en/master/usage.html#kafkaproducer).
+
+Ask the instructor to check if he can see your message!
 
 ## Next step
 

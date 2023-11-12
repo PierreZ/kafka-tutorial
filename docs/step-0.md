@@ -2,7 +2,7 @@
 
 ## Situation
 
-You are an intern in new startup. Your mentor needs you to develop some small applications to help the startup. 
+You are an intern in a new startup. Your mentor needs you to develop some small applications to help your new company.
 
 The startup is growing fast, so there is a lot of new registrations. Each registration is pushed to Kafka, and there is a lot of small tasks to do.
 
