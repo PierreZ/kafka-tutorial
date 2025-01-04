@@ -1,44 +1,45 @@
 # Step 3: Load
 
-Now that you have detected something, let's notify another app.
+With your detections in place, it’s time to notify another application by producing a Kafka message.
 
-## TODOS
+## TODOs
 
-### Create a producer
+### 1. Create a Producer
+To produce messages, you’ll need to create a [KafkaProducer](https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html) at the top of your code. Reuse the same authentication details from the consumer.
 
-You need to create a [KafkaProducer](https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html) at the top of your code.
+**Required Parameters for the Producer:**
+- `security_protocol`: `SASL_SSL`
+- `sasl_mechanism`: `PLAIN`
+- `sasl_plain_username`: `"user"`
+- `sasl_plain_password`: `"toto"`
+- `bootstrap_servers`: `"localhost:8080"`
+- `client_id`: Your team ID
 
-To produce, you will need to set the parameters for the Producer:
+---
 
-* security_protocol=SASL_SSL
-* sasl_mechanism=PLAIN
-* sasl_plain_username="user"
-* sasl_plain_password="toto"
-* bootstrap_servers="localhost:8080"
-* client_id=`your team ID`
+### 2. Create a Message
+Construct a Python dictionary with the following structure:
 
-You can reuse the same auth from the consumer.
+| **Key**    | **Value**                |
+|------------|--------------------------|
+| `customer` | The email of the customer |
+| `type`     | The type assigned to your team |
+| `reason`   | The reason assigned to your team |
+| `team`     | Your team name           |
 
-### Create a message
+Once the dictionary is ready, convert it to JSON using [json.dumps](https://docs.python.org/3/library/json.html).
 
-You need to create a Python dictionary. The dictionary must have these parameters:
+---
 
-| key      | value                    |
-|----------|--------------------------|
-| customer | email of the customer    |
-| type     | the type of your team    |
-| reason   | the reason of your team  |
-| team     | your team                |
+### 3. Push a Message
+Use the Kafka topic `actions` to push your data. 
 
-Once you have created the dictionary, the JSON can be created with [json.dumps](https://docs.python.org/3/library/json.html).
+1. Use the `send` method from your producer to send the message. 
+2. Before sending, convert the JSON string to bytes using:
+   ```python
+   bytes(your_json, "utf-8")
 
-### Push a message
-
-The topic `actions` is the one where you should be pushing data.
-
-You can use the `send` method from your producer. You will need to convert your data from string to bytes by using `bytes(yourJson, "utf-8")`.
-
-The producer will create a Future. You can find some tips on how to manipulate the Future [here](https://kafka-python.readthedocs.io/en/master/usage.html#kafkaproducer).
+3. The send method will return a Future object. For help with handling Futures, refer to this [guide](https://kafka-python.readthedocs.io/en/master/usage.html#kafkaproducer).
 
 Ask the instructor to check if he can see your message!
 
