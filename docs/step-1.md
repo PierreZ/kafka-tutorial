@@ -50,7 +50,7 @@ Example:
 ```python
 import json
 
-# Assuming `message_value` contains the JSON payload
+# Assuming `message` contains the JSON payload
 parsed_message = json.loads(message)
 print(parsed_message["email"])
 ```
