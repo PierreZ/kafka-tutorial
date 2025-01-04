@@ -1,5 +1,5 @@
-interval_millis=100
-topic="test"
-brokers="todo.europe-west1.gcp.confluent.cloud:9092"
+interval_millis=1000
+topic="new_users"
+brokers="zzz.europe-west1.gcp.confluent.cloud:9092"
 username=""
 password=""

@@ -1,7 +1,6 @@
-use config::{ConfigError, File};
+use config::{Config, ConfigError, File};
 use fake::faker::{address, company, creditcard, internet, job, name};
 use fake::Fake;
-use rdkafka::message::OwnedHeaders;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
@@ -44,7 +43,7 @@ impl User {
             },
             field: job::en::Field().fake(),
             company_name: company::en::CompanyName().fake(),
-            company_slogan: company::en::CatchPhase().fake(),
+            company_slogan: company::en::CatchPhrase().fake(),
             profession: company::en::Profession().fake(),
             industry: company::en::Industry().fake(),
             premium: fake::faker::boolean::en::Boolean(50).fake(),
@@ -77,11 +76,12 @@ pub struct Settings {
 // https://github.com/mehcode/config-rs/blob/master/examples/hierarchical-env/src/settings.rs#L39
 impl Settings {
     pub fn from(path: &str) -> Result<Self, ConfigError> {
-        let mut settings = config::Config::default();
-        // Start off by merging in the "default" configuration file
-        settings.merge(File::with_name(path).required(true))?;
+        let s = Config::builder()
+            // Start off by merging in the "default" configuration file
+            .add_source(File::with_name(path))
+            .build()?;
 
-        settings.try_into()
+        s.try_deserialize()
     }
 }
 
@@ -118,10 +118,7 @@ async fn send_message(producer: &FutureProducer, topic_name: &str) {
     let value = serde_json::to_string(&user).unwrap();
     match producer
         .send(
-            FutureRecord::to(topic_name)
-                .payload(&value)
-                .key("")
-                .headers(OwnedHeaders::new().add("source", "producer")),
+            FutureRecord::to(topic_name).payload(&value).key(""),
             Duration::from_secs(0),
         )
         .await
