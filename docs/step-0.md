@@ -1,39 +1,43 @@
-# Step 0: context and helpers
+# Step 0: Context and Helpers
 
 ## Situation
 
-You are an intern in a new startup. Your mentor needs you to develop some small applications to help your new company.
+You’ve recently joined a fast-growing startup as an intern. Your mentor has tasked you with developing small applications to help the company manage its operations. The startup is seeing a rapid increase in new user registrations, and there’s a need to process these registrations efficiently.
 
-The startup is growing fast, so there is a lot of new registrations. Each registration is pushed to Kafka, and there is a lot of small tasks to do.
+Each new registration is sent to Kafka, and your task is to handle various small operations triggered by these messages.
+
+---
 
 ## Architecture
 
-Each team will develop an application that will:
+Each team will develop an application that follows a common pattern known as **ETL** (Extract, Transform, Load):
 
-* read Kafka messages,
-* react to the message,
-* write a Kafka message.
+1. **Extract** data from Kafka messages.
+2. **Transform** the data by applying necessary processing or validation.
+3. **Load** the results back into Kafka by producing new messages.
 
-This is commonly known as **ETL**:
+These applications can be written in any language, but for this tutorial, support will be provided for the following languages:
+- Java
+- Go
+- Python
+- Rust
 
-* **Extract** data,
-* **Transform** data,
-* **Load** data.
+You can use the online Python environment, accessible through the link below, to get started with the tutorial:
 
-The application can be written in any language, but there will be support only in Java, Go, Python or Rust.
+[![Open in GitPod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/PierreZ/kafka-tutorial)
 
-An online Python environment accessible from any browser can be used by clicking on the following link:
+---
 
-[![Open in GitPod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/PierreZ/kafka-tutorial).
+## Libraries
 
-## library
+To connect to Kafka from your application, you can use the following libraries depending on the language you choose:
 
-You can use those libraries to connect to Kafka:
+- [Python client](https://kafka-python.readthedocs.io/en/master/)
+- [Go client](https://github.com/Shopify/sarama)
+- [Rust client](https://github.com/fede1024/rust-rdkafka)
+- [Node client](https://www.npmjs.com/package/kafka-node)
+- [Java client](https://search.maven.org/#artifactdetails%7Corg.apache.kafka%7Ckafka-clients%7C1.1.0%7Cjar)
 
-* [Python client](https://kafka-python.readthedocs.io/en/master/)
-* [Go client](https://github.com/Shopify/sarama)
-* [Rust client](https://github.com/fede1024/rust-rdkafka)
-* [Node client](https://www.npmjs.com/package/kafka-node)
-* [Java client](https://search.maven.org/#artifactdetails%7Corg.apache.kafka%7Ckafka-clients%7C1.1.0%7Cjar)
+---
 
-You can now continue on [step-1](/kafka-tutorial/docs/step-1.html)!
+Now that you have the context, you're ready to dive into the next step! Continue on to [Step 1](/kafka-tutorial/docs/step-1.html) to get started.
