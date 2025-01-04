@@ -1,11 +1,17 @@
-# Step-2: Transform
+# Step 2: Transform
 
-Not that you have parsed your JSON in a structure, it is time to run some verifications on the users!
+Now that you’ve parsed your JSON message into a structured format, it’s time to perform some verifications on the user data based on your team’s specific task.
 
 ## TODOs
 
-* Filter the users according to your team's job
-* Keep the `type` and the `reason` describe above, you will need it later!
+1. **Filter Users:** Implement filters based on your team’s assigned criteria. Each team has a unique objective to achieve, chich can be seen below.
+2. **Retain Key Fields:** Ensure your processing includes the following fields:
+   - `type`: Describes the operation being performed.
+   - `reason`: Explains the context or motivation for the operation.
+
+These fields are crucial for generating the next Kafka message, so be sure to include them in your output.
+
+## Team's criteria
 
 ### Team-1
 
