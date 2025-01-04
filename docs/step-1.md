@@ -30,21 +30,30 @@ The main topic is named "new_users". Here's an example of the JSON pushed:
 
 ## TODOs
 
-### Read Kafka
+### Step 1: Read Kafka Messages
+With the provided GitPod setup, the boilerplate code is already in place for you to begin. 
 
-By loading the GitPod, you should have the boilerplate already setup.
+1. Replace the placeholders `BOOTSTRAP_SERVERS`, `TEAM_NAME`, `SASL_USERNAME`, and `SASL_PASSWORD` with the appropriate values in the code.
+2. Run the code. If everything is configured correctly, you should see the Kafka messages being displayed in the output.
 
-You should be able to run the code by replacing `BOOTSTRAP_SERVERS`, `TEAM_NAME`, `SASL_USERNAME` and `SASL_PASSWORD`. When running the code, you should see the messages.
+#### Questions:
 
-### Questions
+- How many partitions does the topic `new_users` have?
 
-* how many partitions does the topic `new_users` have?
+### Step 2: Parsing the JSON
+Once you see the full Kafka message displayed, it's time to interpret its contents. Each message contains a JSON payload, which can be parsed in Python using the `json` package.
 
-## Parsing the JSON
+1. Use the `json.loads` function to parse the message value.
+2. To confirm successful parsing, extract and print only the `email` field from the JSON.
 
-Now that we are displaying the whole message, we should interpret the `value` of the message. It is a JSON, so in Python, you can use the [json package and the json.loads function](https://docs.python.org/3/library/json.html).
+Example: 
+```python
+import json
 
-To prove that you managed to parse the JSON, try printing only the email.
+# Assuming `message_value` contains the JSON payload
+parsed_message = json.loads(message)
+print(parsed_message["email"])
+```
 
 ## Next step
 
