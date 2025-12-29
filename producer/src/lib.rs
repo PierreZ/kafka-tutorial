@@ -123,10 +123,10 @@ async fn send_message(producer: &FutureProducer, topic_name: &str) {
         )
         .await
     {
-        Ok((partition, offset)) => trace!(
+        Ok(delivery) => trace!(
             "pushed message to partition {} at offset {}",
-            partition,
-            offset
+            delivery.partition,
+            delivery.offset
         ),
         Err((error, message)) => error!("error pushing message: {:?}: {:?}", error, message),
     };

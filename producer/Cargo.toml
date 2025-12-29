@@ -7,12 +7,12 @@ edition = "2021"
 
 [dependencies]
 tracing = "0.1"
-tracing-subscriber = { version = "0.3.16", features = ["env-filter"]}
-fake = { version = "3.1", features=['derive', 'http']}
-rand = "0.8"
-rdkafka = { version = "0.37", features = ["cmake-build", "ssl"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"]}
+fake = { version = "4.4", features=['derive', 'http']}
+rand = "0.9"
+rdkafka = { version = "0.38", features = ["cmake-build", "ssl"] }
 
-tokio = { version = "1.21", features = ["full"] }
+tokio = { version = "1.48", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 structopt = "0.3"
