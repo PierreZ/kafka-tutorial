@@ -71,6 +71,49 @@
         --command-config "$COMMAND_CONFIG"
 
       echo "Topic creation complete!"
+
+      # Create ACLs for each team
+      echo "Creating ACLs for teams..."
+
+      for team_num in $(seq 1 15); do
+        team="team-$team_num"
+        echo "Setting up ACLs for $team..."
+
+        # READ access to 'new_users' topic
+        kafka-acls.sh --bootstrap-server "$BOOTSTRAP_SERVER" \
+          --command-config "$COMMAND_CONFIG" \
+          --add \
+          --allow-principal "User:$team" \
+          --operation Read \
+          --operation Describe \
+          --topic new_users
+
+        # WRITE access to 'actions' topic
+        kafka-acls.sh --bootstrap-server "$BOOTSTRAP_SERVER" \
+          --command-config "$COMMAND_CONFIG" \
+          --add \
+          --allow-principal "User:$team" \
+          --operation Write \
+          --operation Describe \
+          --topic actions
+
+        # Consumer group access (READ on group matching team name)
+        kafka-acls.sh --bootstrap-server "$BOOTSTRAP_SERVER" \
+          --command-config "$COMMAND_CONFIG" \
+          --add \
+          --allow-principal "User:$team" \
+          --operation Read \
+          --operation Describe \
+          --group "$team"
+      done
+
+      # List ACLs to verify
+      echo "Verifying ACLs..."
+      kafka-acls.sh --bootstrap-server "$BOOTSTRAP_SERVER" \
+        --command-config "$COMMAND_CONFIG" \
+        --list
+
+      echo "ACL setup complete!"
     '';
   };
 }

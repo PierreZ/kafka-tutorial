@@ -6,9 +6,27 @@ NixOS-based OpenStack image that bootstraps Apache Kafka in KRaft mode for the t
 
 - Apache Kafka in KRaft mode (no ZooKeeper)
 - SASL/PLAIN authentication on port 443
+- ACL-based authorization (teams have restricted access)
 - Pre-configured topics: `new_users` and `actions`
 - 15 team credentials ready to use
 - OpenStack cloud-init support
+
+## Security Model
+
+Each team has restricted access via Kafka ACLs:
+
+| Permission | Resource | Operations |
+|------------|----------|------------|
+| READ | Topic `new_users` | Read, Describe |
+| WRITE | Topic `actions` | Write, Describe |
+| READ | Consumer Group `team-N` | Read, Describe |
+
+Teams can only:
+- Consume from `new_users`
+- Produce to `actions`
+- Use their own consumer group (e.g., team-1 uses group `team-1`)
+
+The `admin` user has super-user privileges (full access).
 
 ## Building the Image
 

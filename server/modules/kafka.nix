@@ -68,6 +68,10 @@ in
       # Super users (admin can do everything)
       "super.users" = "User:admin";
 
+      # Authorization - enable ACLs
+      "authorizer.class.name" = "org.apache.kafka.metadata.authorizer.StandardAuthorizer";
+      "allow.everyone.if.no.acl.found" = false;
+
       # Topic defaults
       "num.partitions" = 3;
       "default.replication.factor" = 1;
