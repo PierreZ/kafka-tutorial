@@ -15,38 +15,38 @@ These fields are crucial for generating the next Kafka message, so be sure to in
 
 ### Team-1
 
-We are receiving a lot of spams from Yahoo. We need to send a verification mail if the `email` field is from yahoo.
+We want to reach out to users with legacy email providers. Flag users if their `email` contains `hotmail`.
 
-* type: "EMAIL_VERIFICATION",
-* reason: "MIGHT_BE_FRAUD"
+* type: "CONTACT_CUSTOMER",
+* reason: "LEGACY_EMAIL_PROVIDER"
 
 ### Team-2
 
-We have a lot of stolen credit-card. We need to check credit-card if it is starting with `55`.
+American Express cards starting with `37` require additional verification due to higher processing fees. Flag credit cards that start with `37`.
 
 * type: "CREDIT_CARD_VERIFICATION",
-* reason: "MIGHT_BE_FRAUD"
+* reason: "AMEX_CARD"
 
 ### Team-3
 
-We need to boost sales. We need to contact the customer if the `company_name` contains `Inc`.
+Our sales team wants to target financial sector customers. Contact users if their `industry` contains `Bank`, `Financ`, `Insur`, `Invest`, `Account`, or `Capital`.
 
-* type: "CONTACT_CUSTOMER",
-* reason: "UPSALE"
+* type: "SALES_LEAD",
+* reason: "FINANCIAL_SECTOR"
 
 ### Team-4
 
-We need to buy other companies. We need to contact them if the `company_slogan` contains `middleware`.
+We are looking to acquire tech companies. Flag users if their `industry` contains `Computer`, `Internet`, `Semiconductor`, `Telecom`, or `Wireless`.
 
-* type: "CONTACT_CUSTOMER",
-* reason: "BUY"
+* type: "ACQUISITION_TARGET",
+* reason: "TECH_COMPANY"
 
 ### Team-5
 
-We cannot host medical companies. We need to contact if the industry contains words like `Hospital`, `Health` or`Care`
+Due to compliance requirements, we cannot host healthcare companies. Contact users if their `industry` contains `Health`, `Hospital`, `Medical`, `Pharma`, `Biotech`, or `Veterinary`.
 
 * type: "CONTACT_CUSTOMER",
-* reason: "BAN"
+* reason: "HEALTHCARE_COMPLIANCE"
 
 ### Team-6
 
@@ -57,52 +57,52 @@ We need more developers: We need to contact if the profession is an `engineer`.
 
 ### Team-7
 
-We need to take care of premium users. We need to contact them if the `premium` is `true`.
+We need to identify VIP users for special offers. Contact users if `premium` is `true` AND `credit` is greater than `10`.
 
 * type: "CONTACT_CUSTOMER",
-* reason: "PREMIUM"
+* reason: "VIP_USER"
 
 ### Team-8
 
-Some customers have negative credits, we need to warn them.
+Some customers have severely negative credits and need urgent attention. Warn users if `credit` is less than `-15`.
 
 * type: "CONTACT_CUSTOMER",
-* reason: "LOW_CREDIT"
+* reason: "CRITICAL_DEBT"
 
 ### Team-9
 
-Due to some technical issues, we need to trigger some action if the user is not in Europe.
+We are expanding to Asia-Pacific markets. Contact users if their `time_zone` starts with `Asia/`.
 
-* type: "TRIGGER_JOB_BILLING",
-* reason: "NOT_IN_EUROPE"
+* type: "CONTACT_CUSTOMER",
+* reason: "APAC_EXPANSION"
 
 ### Team-10
 
-Due to the frontend stack, we need to warn users if there `user_agent` contains `Windows NT`.
+Our frontend doesn't support Internet Explorer. Warn users if their `user_agent` contains `MSIE` or `Trident`.
 
 * type: "CONTACT_CUSTOMER",
-* reason: "UNSUPPORTED_WINDOWS_PLATFORM"
+* reason: "LEGACY_BROWSER"
 
 ### Team-11
 
-We need to provide analytics according to the time_zone. Read 100 messages, and count how many messages are from Europe. 
+Due to GDPR regulations, we need to trigger a compliance workflow for users in Europe. Filter users if their `time_zone` starts with `Europe/`.
 
-* type: "ANALYTICS_TIME_ZONE_EUROPE",
-* reason: "your count as a string"
+* type: "TRIGGER_GDPR_COMPLIANCE",
+* reason: "IN_EUROPE"
 
 ### Team-12
 
-We need more HRs: We need to contact if the profession is an `human resources`.
+We need tech professionals. Contact users if their `field` is `IT` or `Technology`.
 
 * type: "HIRE_CUSTOMER",
-* reason: "IS_HR"
+* reason: "TECH_PROFESSIONAL"
 
 ### Team-13
 
-We need to check the avatars: we need to contact if the avatar is not from robothash.
+We need to ensure profile completeness. Contact users if their `avatar` is `example.org` or doesn't start with `https://`.
 
 * type: "CONTACT_CUSTOMER",
-* reason: "BAD_AVATAR"
+* reason: "INVALID_AVATAR"
 
 ### Team-14
 
