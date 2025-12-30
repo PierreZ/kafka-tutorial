@@ -19,7 +19,9 @@
     script = ''
       set -euo pipefail
 
-      BOOTSTRAP_SERVER="localhost:443"
+      # Use BOOTSTRAP_PORT env var if set (for testing), otherwise default to 443
+      BOOTSTRAP_PORT="''${BOOTSTRAP_PORT:-443}"
+      BOOTSTRAP_SERVER="localhost:$BOOTSTRAP_PORT"
       COMMAND_CONFIG="/etc/kafka/admin.properties"
       MAX_RETRIES=30
       RETRY_INTERVAL=5

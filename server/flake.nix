@@ -15,6 +15,11 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in
     {
+      # Integration tests (run with: nix flake check or nix build .#checks.x86_64-linux.integration -L)
+      checks.${system} = {
+        integration = import ./tests { inherit pkgs; };
+      };
+
       packages.${system} = {
         # OpenStack QCOW2 image
         openstack = nixos-generators.nixosGenerate {
