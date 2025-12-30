@@ -9,24 +9,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
-/// Create a Kafka producer for state persistence
-pub fn create_state_producer(
-    brokers: &str,
-    username: &str,
-    password: &str,
-) -> Result<FutureProducer> {
-    let producer: FutureProducer = ClientConfig::new()
-        .set("client.id", "leaderboard-state-producer")
-        .set("bootstrap.servers", brokers)
-        .set("message.timeout.ms", "5000")
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", username)
-        .set("sasl.password", password)
-        .create()?;
-    Ok(producer)
-}
-
 /// Persist team state to Kafka topic
 pub async fn persist_state(
     producer: &FutureProducer,

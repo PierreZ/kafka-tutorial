@@ -1,123 +1,60 @@
-use super::achievements::{check_progress_achievements, Achievement, AchievementType};
-use crate::validation::{ErrorType, ValidationResult};
+use super::achievements::AchievementType;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-/// State for a single team
+/// State for a single team - simplified for step-based tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TeamState {
     pub team_name: String,
-    pub score: u64,
-    pub correct_count: u64,
-    pub incorrect_count: u64,
-    pub current_streak: u32,
-    pub best_streak: u32,
-    pub achievements: Vec<Achievement>,
-    pub error_counts: HashMap<ErrorType, u32>,
+    pub achievements: HashSet<AchievementType>,
+    pub action_count: u64,    // Valid messages to actions topic
+    pub watchlist_count: u64, // Messages to watchlist topic
+    pub error_counts: HashMap<AchievementType, u32>, // ParseError and MissingFields counts
 }
 
 impl TeamState {
     pub fn new(team_name: String) -> Self {
         Self {
             team_name,
-            score: 0,
-            correct_count: 0,
-            incorrect_count: 0,
-            current_streak: 0,
-            best_streak: 0,
-            achievements: Vec::new(),
+            achievements: HashSet::new(),
+            action_count: 0,
+            watchlist_count: 0,
             error_counts: HashMap::new(),
         }
     }
 
-    /// Process a validation result and return any new achievements unlocked
-    pub fn process_result(&mut self, result: &ValidationResult) -> Vec<AchievementType> {
-        match result {
-            ValidationResult::Correct { points } => {
-                self.correct_count += 1;
-                self.score += *points as u64;
-                self.current_streak += 1;
-                if self.current_streak > self.best_streak {
-                    self.best_streak = self.current_streak;
-                }
+    /// Unlock an achievement, returns true if newly unlocked
+    pub fn unlock_achievement(&mut self, achievement: AchievementType) -> bool {
+        self.achievements.insert(achievement)
+    }
 
-                // Check for new progress achievements
-                let new_achievements =
-                    check_progress_achievements(self.correct_count, self.current_streak, &self.achievements);
+    /// Check if team has a specific achievement
+    pub fn has_achievement(&self, achievement: AchievementType) -> bool {
+        self.achievements.contains(&achievement)
+    }
 
-                for achievement_type in &new_achievements {
-                    self.score += achievement_type.points() as u64;
-                    self.achievements.push(Achievement::new(*achievement_type));
-                }
-
-                new_achievements
-            }
-            ValidationResult::Incorrect { error } => {
-                self.incorrect_count += 1;
-                self.current_streak = 0; // Reset streak on error
-
-                // Track error counts
-                *self.error_counts.entry(error.error_type).or_insert(0) += 1;
-
-                // Check for mistake achievements (first occurrence)
-                let mut new_achievements = Vec::new();
-                let mistake_achievement = match error.error_type {
-                    ErrorType::InvalidJson => Some(AchievementType::ParseError),
-                    ErrorType::NonExistentUser => Some(AchievementType::GhostUser),
-                    ErrorType::DuplicateAction => Some(AchievementType::Duplicate),
-                    ErrorType::MissingFields => Some(AchievementType::MissingFields),
-                    ErrorType::FalsePositive => Some(AchievementType::FalsePositive),
-                    _ => None,
-                };
-
-                if let Some(achievement_type) = mistake_achievement {
-                    let already_has = self
-                        .achievements
-                        .iter()
-                        .any(|a| a.achievement_type == achievement_type);
-                    if !already_has {
-                        self.achievements.push(Achievement::new(achievement_type));
-                        new_achievements.push(achievement_type);
-                    }
-                }
-
-                new_achievements
-            }
+    /// Record an error (increments count and marks as encountered)
+    pub fn record_error(&mut self, error: AchievementType) {
+        if error.is_error() {
+            *self.error_counts.entry(error).or_insert(0) += 1;
+            self.achievements.insert(error);
         }
     }
 
-    /// Add an infrastructure achievement if not already unlocked
-    pub fn add_infrastructure_achievement(&mut self, achievement_type: AchievementType) -> bool {
-        let already_has = self
-            .achievements
-            .iter()
-            .any(|a| a.achievement_type == achievement_type);
-        if !already_has {
-            self.score += achievement_type.points() as u64;
-            self.achievements.push(Achievement::new(achievement_type));
-            true
-        } else {
-            false
-        }
+    /// Get error count for a specific error type
+    pub fn get_error_count(&self, error: AchievementType) -> u32 {
+        *self.error_counts.get(&error).unwrap_or(&0)
     }
 
-    /// Get total number of actions (correct + incorrect)
-    pub fn total_actions(&self) -> u64 {
-        self.correct_count + self.incorrect_count
-    }
-
-    /// Get accuracy percentage
-    pub fn accuracy(&self) -> f64 {
-        if self.total_actions() == 0 {
-            0.0
-        } else {
-            (self.correct_count as f64 / self.total_actions() as f64) * 100.0
-        }
+    /// Count of step achievements earned (for sorting)
+    pub fn step_count(&self) -> usize {
+        self.achievements.iter().filter(|a| a.is_step()).count()
     }
 }
 
 /// Consumer group status for a team
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ConsumerGroupStatus {
     pub team_name: String,
     pub state: GroupState,
@@ -126,6 +63,7 @@ pub struct ConsumerGroupStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum GroupState {
     Active,
     Rebalancing,
@@ -147,41 +85,46 @@ impl std::fmt::Display for GroupState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validation::ValidationError;
 
     #[test]
-    fn test_team_state_correct_action() {
+    fn test_unlock_achievement() {
         let mut state = TeamState::new("team-1".to_string());
 
-        let result = ValidationResult::Correct { points: 10 };
-        let achievements = state.process_result(&result);
-
-        assert_eq!(state.correct_count, 1);
-        assert_eq!(state.current_streak, 1);
-        assert!(achievements.contains(&AchievementType::FirstSteps));
+        // First unlock returns true
+        assert!(state.unlock_achievement(AchievementType::Connected));
+        // Second unlock returns false
+        assert!(!state.unlock_achievement(AchievementType::Connected));
     }
 
     #[test]
-    fn test_team_state_incorrect_action() {
+    fn test_has_achievement() {
         let mut state = TeamState::new("team-1".to_string());
-        state.current_streak = 5;
+        assert!(!state.has_achievement(AchievementType::Connected));
 
-        let result = ValidationResult::Incorrect {
-            error: ValidationError::new(ErrorType::InvalidJson, "Bad JSON"),
-        };
-        let achievements = state.process_result(&result);
-
-        assert_eq!(state.incorrect_count, 1);
-        assert_eq!(state.current_streak, 0); // Streak reset
-        assert!(achievements.contains(&AchievementType::ParseError));
+        state.unlock_achievement(AchievementType::Connected);
+        assert!(state.has_achievement(AchievementType::Connected));
     }
 
     #[test]
-    fn test_accuracy() {
+    fn test_record_error() {
         let mut state = TeamState::new("team-1".to_string());
-        state.correct_count = 9;
-        state.incorrect_count = 1;
 
-        assert!((state.accuracy() - 90.0).abs() < 0.001);
+        state.record_error(AchievementType::ParseError);
+        state.record_error(AchievementType::ParseError);
+
+        assert_eq!(state.get_error_count(AchievementType::ParseError), 2);
+        assert!(state.has_achievement(AchievementType::ParseError));
+    }
+
+    #[test]
+    fn test_step_count() {
+        let mut state = TeamState::new("team-1".to_string());
+        assert_eq!(state.step_count(), 0);
+
+        state.unlock_achievement(AchievementType::Connected);
+        state.unlock_achievement(AchievementType::FirstLoad);
+        state.unlock_achievement(AchievementType::ParseError); // Error, not a step
+
+        assert_eq!(state.step_count(), 2);
     }
 }

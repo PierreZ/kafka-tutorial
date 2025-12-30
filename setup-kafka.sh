@@ -52,6 +52,19 @@ docker exec "$CONTAINER_NAME" kafka-topics.sh --create \
     --command-config /tmp/admin.properties \
     --topic actions --partitions 2 --replication-factor 1 --if-not-exists
 
+# Create log-compacted topics for step 5 (watchlist) and leaderboard state
+docker exec "$CONTAINER_NAME" kafka-topics.sh --create \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --topic watchlist --partitions 2 --replication-factor 1 \
+    --config cleanup.policy=compact --if-not-exists
+
+docker exec "$CONTAINER_NAME" kafka-topics.sh --create \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --topic scorer_state --partitions 1 --replication-factor 1 \
+    --config cleanup.policy=compact --if-not-exists
+
 # Create ACLs
 echo ""
 echo "=== Creating ACLs ==="
@@ -73,6 +86,14 @@ for team_num in $(seq 1 15); do
         --operation Write --operation Describe \
         --topic actions --force >/dev/null
 
+    # Allow teams to write to watchlist (step 5)
+    docker exec "$CONTAINER_NAME" kafka-acls.sh \
+        --bootstrap-server localhost:9092 \
+        --command-config /tmp/admin.properties \
+        --add --allow-principal "User:$team" \
+        --operation Write --operation Describe \
+        --topic watchlist --force >/dev/null
+
     docker exec "$CONTAINER_NAME" kafka-acls.sh \
         --bootstrap-server localhost:9092 \
         --command-config /tmp/admin.properties \
@@ -81,7 +102,38 @@ for team_num in $(seq 1 15); do
         --group "$team" --force >/dev/null
 done
 
+# Create leaderboard user ACLs for scorer_state topic
+echo "Setting up leaderboard user..."
+docker exec "$CONTAINER_NAME" kafka-acls.sh \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --add --allow-principal "User:leaderboard" \
+    --operation Read --operation Write --operation Describe \
+    --topic scorer_state --force >/dev/null
+
+docker exec "$CONTAINER_NAME" kafka-acls.sh \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --add --allow-principal "User:leaderboard" \
+    --operation Read --operation Describe \
+    --topic actions --force >/dev/null
+
+docker exec "$CONTAINER_NAME" kafka-acls.sh \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --add --allow-principal "User:leaderboard" \
+    --operation Read --operation Describe \
+    --topic watchlist --force >/dev/null
+
+docker exec "$CONTAINER_NAME" kafka-acls.sh \
+    --bootstrap-server localhost:9092 \
+    --command-config /tmp/admin.properties \
+    --add --allow-principal "User:leaderboard" \
+    --operation Read --operation Describe \
+    --group "leaderboard" --resource-pattern-type prefixed --force >/dev/null
+
 echo ""
 echo "=== Setup Complete ==="
-echo "Topics: new_users, actions"
+echo "Topics: new_users, actions, watchlist (compacted), scorer_state (compacted)"
 echo "Teams: team-1 through team-15 (password: team-N-secret)"
+echo "Leaderboard user: leaderboard (password: leaderboard-secret)"

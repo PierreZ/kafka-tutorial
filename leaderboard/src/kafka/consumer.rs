@@ -24,24 +24,3 @@ pub fn create_consumer(
 
     Ok(consumer)
 }
-
-/// Create a consumer that reads from the beginning (for restoring state)
-pub fn create_restore_consumer(
-    brokers: &str,
-    username: &str,
-    password: &str,
-    group_id: &str,
-) -> Result<StreamConsumer> {
-    let consumer: StreamConsumer = ClientConfig::new()
-        .set("group.id", group_id)
-        .set("bootstrap.servers", brokers)
-        .set("enable.auto.commit", "false")
-        .set("auto.offset.reset", "earliest")
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", username)
-        .set("sasl.password", password)
-        .create()?;
-
-    Ok(consumer)
-}

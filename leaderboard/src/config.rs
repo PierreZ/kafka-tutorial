@@ -3,6 +3,7 @@ use config::{Config, File};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct Settings {
     pub kafka: KafkaSettings,
     pub topics: TopicSettings,
@@ -18,6 +19,7 @@ pub struct KafkaSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct TopicSettings {
     pub new_users: String,
     pub actions: String,
@@ -26,6 +28,7 @@ pub struct TopicSettings {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct ScoringSettings {
     pub points_per_correct: u32,
     pub user_cache_max_size: usize,
