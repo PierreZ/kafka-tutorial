@@ -1,0 +1,133 @@
+name: NixOS Server - Test and Build
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'server/**'
+      - '.github/workflows/nixos-server.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests and only build the image'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    name: Run NixOS Tests
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-24.11
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Check flake
+        working-directory: ./server
+        run: nix flake check --print-build-logs
+
+      - name: Run Kafka tutorial test
+        working-directory: ./server
+        run: |
+          nix build .#checks.x86_64-linux.kafka-tutorial --print-build-logs
+          echo "Test completed successfully!"
+
+  build:
+    name: Build OpenStack Image
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Run build even if tests were skipped (workflow_dispatch with skip_tests)
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          echo "Freeing up disk space..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-24.11
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Build OpenStack image
+        working-directory: ./server
+        run: |
+          nix build .#openstack --print-build-logs
+          echo "Build completed!"
+          ls -lah result/
+
+      - name: Prepare artifact
+        id: prepare
+        run: |
+          # Find the qcow2 image
+          IMAGE_PATH=$(find ./server/result -name "*.qcow2" -o -name "*.img" | head -1)
+          if [ -z "$IMAGE_PATH" ]; then
+            echo "No image found, listing result directory:"
+            ls -laR ./server/result/
+            # Try to find any file in result
+            IMAGE_PATH=$(find ./server/result -type f | head -1)
+          fi
+
+          echo "Found image: $IMAGE_PATH"
+
+          # Create artifact directory
+          mkdir -p artifacts
+
+          # Copy and rename the image
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          ARTIFACT_NAME="kafka-tutorial-nixos-${TIMESTAMP}.qcow2"
+          cp "$IMAGE_PATH" "artifacts/${ARTIFACT_NAME}"
+
+          echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+          echo "artifact_path=artifacts/${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
+
+          # Show image info
+          ls -lah artifacts/
+
+      - name: Upload OpenStack image
+        uses: actions/upload-artifact@v4
+        with:
+          name: kafka-tutorial-openstack-image
+          path: artifacts/
+          retention-days: 30
+          compression-level: 0  # qcow2 is already compressed
+
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ steps.prepare.outputs.artifact_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact**: kafka-tutorial-openstack-image" >> $GITHUB_STEP_SUMMARY
+          echo "- **Retention**: 30 days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Usage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Upload to OpenStack:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "openstack image create --disk-format qcow2 --container-format bare \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --file ${{ steps.prepare.outputs.artifact_name }} kafka-tutorial" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
