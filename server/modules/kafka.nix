@@ -52,11 +52,19 @@ in
       # Listeners configuration
       # Port 443 for external clients (SASL_PLAINTEXT)
       # Port 9093 for internal controller (PLAINTEXT)
-      "listeners" = "SASL_PLAINTEXT://0.0.0.0:443,CONTROLLER://localhost:9093";
-      "advertised.listeners" = "SASL_PLAINTEXT://0.0.0.0:443";
-      "listener.security.protocol.map" = "SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT";
+      "listeners" = [
+        "SASL_PLAINTEXT://0.0.0.0:443"
+        "CONTROLLER://localhost:9093"
+      ];
+      "advertised.listeners" = [
+        "SASL_PLAINTEXT://0.0.0.0:443"
+      ];
+      "listener.security.protocol.map" = [
+        "SASL_PLAINTEXT:SASL_PLAINTEXT"
+        "CONTROLLER:PLAINTEXT"
+      ];
       "inter.broker.listener.name" = "SASL_PLAINTEXT";
-      "controller.listener.names" = "CONTROLLER";
+      "controller.listener.names" = [ "CONTROLLER" ];
 
       # SASL/PLAIN authentication
       "sasl.enabled.mechanisms" = "PLAIN";
@@ -82,7 +90,7 @@ in
       "log.retention.hours" = 168; # 7 days
 
       # Log directories
-      "log.dirs" = "/var/lib/kafka/logs";
+      "log.dirs" = [ "/var/lib/kafka/logs" ];
     };
   };
 

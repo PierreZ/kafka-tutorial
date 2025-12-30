@@ -68,8 +68,13 @@ in
 
       # Override listeners for testing (use non-privileged port)
       services.apache-kafka.settings = {
-        "listeners" = lib.mkForce "SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://localhost:9093";
-        "advertised.listeners" = lib.mkForce "SASL_PLAINTEXT://localhost:9092";
+        "listeners" = lib.mkForce [
+          "SASL_PLAINTEXT://0.0.0.0:9092"
+          "CONTROLLER://localhost:9093"
+        ];
+        "advertised.listeners" = lib.mkForce [
+          "SASL_PLAINTEXT://localhost:9092"
+        ];
       };
 
       # Remove capability requirement for test (using port 9092)

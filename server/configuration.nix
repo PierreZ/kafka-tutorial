@@ -39,10 +39,10 @@
     options = "--delete-older-than 7d";
   };
 
-  # Documentation
+  # Documentation (use mkForce to override openstack-image.nix defaults)
   documentation = {
-    enable = false;
-    man.enable = false;
-    nixos.enable = false;
+    enable = lib.mkForce false;
+    man.enable = lib.mkForce false;
+    nixos.enable = lib.mkForce false;
   };
 }
