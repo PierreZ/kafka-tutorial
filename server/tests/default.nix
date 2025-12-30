@@ -11,8 +11,8 @@ pkgs.testers.runNixOSTest {
 
     # Override for VM testing (use non-privileged port 9092)
     services.apache-kafka.settings = {
-      "listeners" = lib.mkForce "SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://localhost:9093";
-      "advertised.listeners" = lib.mkForce "SASL_PLAINTEXT://0.0.0.0:9092";
+      "listeners" = lib.mkForce [ "SASL_PLAINTEXT://0.0.0.0:9092" "CONTROLLER://localhost:9093" ];
+      "advertised.listeners" = lib.mkForce [ "SASL_PLAINTEXT://0.0.0.0:9092" ];
     };
 
     # Update bootstrap script to use port 9092

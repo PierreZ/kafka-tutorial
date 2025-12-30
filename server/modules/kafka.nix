@@ -52,8 +52,8 @@ in
       # Listeners configuration
       # Port 443 for external clients (SASL_PLAINTEXT)
       # Port 9093 for internal controller (PLAINTEXT)
-      "listeners" = "SASL_PLAINTEXT://0.0.0.0:443,CONTROLLER://localhost:9093";
-      "advertised.listeners" = "SASL_PLAINTEXT://0.0.0.0:443";
+      "listeners" = [ "SASL_PLAINTEXT://0.0.0.0:443" "CONTROLLER://localhost:9093" ];
+      "advertised.listeners" = [ "SASL_PLAINTEXT://0.0.0.0:443" ];
       "listener.security.protocol.map" = "SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT";
       "inter.broker.listener.name" = "SASL_PLAINTEXT";
       "controller.listener.names" = "CONTROLLER";
