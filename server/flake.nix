@@ -52,5 +52,11 @@
           };
         };
       };
+
+      # NixOS tests for verifying the Kafka tutorial server
+      checks.${system} = {
+        # Full integration test of the Kafka tutorial server
+        kafka-tutorial = pkgs.nixosTest (import ./tests/kafka-test.nix { inherit pkgs; lib = pkgs.lib; });
+      };
     };
 }
