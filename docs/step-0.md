@@ -40,4 +40,49 @@ To connect to Kafka from your application, you can use the following libraries d
 
 ---
 
+## Leaderboard & Achievements
+
+Your instructor has a real-time leaderboard that tracks your team's progress! Earn points by correctly processing messages and unlock achievements along the way.
+
+### How Scoring Works
+
+Every action your team produces to the `actions` topic is validated:
+- ✅ Valid JSON with all required fields (`customer`, `type`, `reason`, `team`)
+- ✅ User exists in the `new_users` topic
+- ✅ User matches your team's filter criteria
+- ✅ Correct `type` and `reason` values
+- ✅ No duplicate actions
+
+Each valid action earns **10 points**.
+
+### Progress Achievements
+
+| Badge | Name | How to Unlock | Points |
+|-------|------|---------------|--------|
+| 🐣 | **First Steps** | Produce your first valid action | 10 |
+| 🔥 | **Fifty** | Produce 50 valid actions | 100 |
+| 💯 | **Century** | Produce 100 valid actions | 200 |
+| ⚡ | **Streak 10** | 10 consecutive correct actions | 50 |
+
+### Mistake Achievements (0 points - educational)
+
+These help you identify what went wrong:
+
+| Badge | Name | What Went Wrong |
+|-------|------|-----------------|
+| ❌ | **Parse Error** | Invalid JSON format |
+| 👻 | **Ghost User** | Customer doesn't exist in `new_users` |
+| 2️⃣ | **Duplicate** | Already flagged this customer |
+| ❓ | **Missing Fields** | Missing required fields |
+| 🙈 | **False Positive** | User doesn't match your filter |
+
+### Infrastructure Achievements
+
+| Badge | Name | How to Unlock | Points |
+|-------|------|---------------|--------|
+| 🔌 | **Connected** | Consumer group is active | 25 |
+| 👥 | **Scaled** | 2+ consumers in your group | 50 |
+
+---
+
 Now that you have the context, you're ready to dive into the next step! Continue on to [Step 1](/kafka-tutorial/docs/step-1.html) to get started.
