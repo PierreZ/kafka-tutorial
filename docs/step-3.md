@@ -8,7 +8,7 @@ With your detections in place, it’s time to notify another application by prod
 To produce messages, you’ll need to create a [KafkaProducer](https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html) at the top of your code. Reuse the same authentication details from the consumer.
 
 **Required Parameters for the Producer:**
-- `security_protocol`: `SASL_SSL`
+- `security_protocol`: `SASL_PLAINTEXT`
 - `sasl_mechanism`: `PLAIN`
 - `sasl_plain_username`: `"user"`
 - `sasl_plain_password`: `"toto"`

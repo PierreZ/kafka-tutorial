@@ -12,7 +12,7 @@ Two main components:
 - **Python consumer/producer** (`main.py`): Template code for tutorial participants using `kafka-python`
 - **Rust producer** (`producer/`): Generates fake user data and publishes to Kafka using `rdkafka`
 
-Both connect via SASL_SSL with PLAIN mechanism to Confluent Cloud.
+Both connect via SASL_PLAINTEXT with PLAIN mechanism. Local development uses Docker (see `local-dev/`).
 
 ## Build and Run Commands
 
@@ -39,11 +39,17 @@ pip install kafka-python
 python main.py
 ```
 
-### Nix Development Environment
+### Kafka Server (Docker)
 
 ```bash
-cd producer
-direnv allow  # or: nix develop
+# Start container (local)
+./start-kafka.sh localhost
+
+# Start container (cloud - replace with your VM's public IP)
+./start-kafka.sh 1.2.3.4
+
+# Create topics and ACLs
+./setup-kafka.sh
 ```
 
 ## Configuration
