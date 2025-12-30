@@ -1,0 +1,21 @@
+[package]
+name = "leaderboard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rdkafka.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+config.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+ratatui = "0.29"
+crossterm = "0.28"
+clap = { version = "4", features = ["derive"] }
+futures = "0.3"
