@@ -4,7 +4,7 @@ Now that you’ve parsed your JSON message into a structured format, it’s time
 
 ## TODOs
 
-1. **Filter Users:** Implement filters based on your team’s assigned criteria. Each team has a unique objective to achieve, chich can be seen below.
+1. **Filter Users:** Implement filters based on your team's assigned criteria. Each team has a unique objective to achieve, which can be seen below.
 2. **Retain Key Fields:** Ensure your processing includes the following fields:
    - `type`: Describes the operation being performed.
    - `reason`: Explains the context or motivation for the operation.
@@ -117,7 +117,19 @@ We need to check the pack, we need to send a mail to all `free` pack.
 
 * type: "CONTACT_CUSTOMER",
 * reason: "UPGRADE_FREE"
-  
+
+---
+
+## Achievements
+
+When you produce actions in the next step, watch the leaderboard for feedback:
+- **False Positive**: You flagged a user who doesn't match your filter criteria
+- **Ghost User**: The customer email doesn't exist in the `new_users` topic
+
+Getting your filter logic right is key to earning points!
+
+---
+
 ## Next step
 
 Congratulations, you learned how to apply a filter on a Kafka stream 🎉
