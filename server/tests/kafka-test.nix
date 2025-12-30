@@ -1,5 +1,3 @@
-{ pkgs, lib, ... }:
-
 # NixOS test for the Kafka Tutorial server
 # This test verifies:
 # 1. Kafka starts successfully in KRaft mode
@@ -7,6 +5,8 @@
 # 3. Producing and consuming messages works
 # 4. SASL authentication works correctly
 # 5. The full ETL pipeline can be simulated
+
+{ pkgs, lib, ... }:
 
 let
   # Test user credentials (from kafka.nix)
@@ -42,29 +42,18 @@ let
     team = "team-1";
   };
 
-  # Client properties for authenticated access
-  teamClientProperties = pkgs.writeText "team-client.properties" ''
-    security.protocol=SASL_PLAINTEXT
-    sasl.mechanism=PLAIN
-    sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${testUsername}" password="${testPassword}";
-  '';
-
-  adminClientProperties = pkgs.writeText "admin-client.properties" ''
-    security.protocol=SASL_PLAINTEXT
-    sasl.mechanism=PLAIN
-    sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${adminUsername}" password="${adminPassword}";
-  '';
+  # Escape single quotes for shell
+  escapedSampleUser = builtins.replaceStrings ["'"] ["'\\''"] sampleUser;
+  escapedSampleAction = builtins.replaceStrings ["'"] ["'\\''"] sampleAction;
 
 in
 {
   name = "kafka-tutorial";
 
-  meta = with lib.maintainers; {
-    maintainers = [ ];
-  };
+  meta.maintainers = [ ];
 
   nodes = {
-    server = { config, pkgs, ... }: {
+    server = { config, pkgs, lib, ... }: {
       imports = [
         ../modules/kafka.nix
         ../modules/kafka-bootstrap.nix
@@ -146,7 +135,11 @@ in
       ];
 
       # Make client properties available
-      environment.etc."kafka/team-client.properties".source = teamClientProperties;
+      environment.etc."kafka/team-client.properties".text = ''
+        security.protocol=SASL_PLAINTEXT
+        sasl.mechanism=PLAIN
+        sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${testUsername}" password="${testPassword}";
+      '';
     };
   };
 
@@ -190,9 +183,8 @@ in
         )
 
     with subtest("Produce message to new_users topic"):
-        # Write the sample user JSON to a temp file and produce it
         server.succeed(
-            f"echo '{sampleUser.replace("'", "\\'")}' | "
+            "echo '${escapedSampleUser}' | "
             "kafka-console-producer.sh "
             "--bootstrap-server localhost:9092 "
             "--topic new_users "
@@ -208,14 +200,13 @@ in
             "--max-messages 1 "
             "--consumer.config /etc/kafka/team-client.properties"
         )
-        # Parse and verify the message content
         msg = json.loads(result.strip())
         assert msg["email"] == "test_user@hotmail.com", f"Email mismatch: {msg}"
         assert msg["premium"] == True, f"Premium flag mismatch: {msg}"
 
     with subtest("Produce action message to actions topic"):
         server.succeed(
-            f"echo '{sampleAction.replace("'", "\\'")}' | "
+            "echo '${escapedSampleAction}' | "
             "kafka-console-producer.sh "
             "--bootstrap-server localhost:9092 "
             "--topic actions "
@@ -237,7 +228,6 @@ in
         assert msg["team"] == "team-1", f"Team mismatch: {msg}"
 
     with subtest("Test consumer group functionality"):
-        # Create a consumer group and verify it exists
         server.succeed(
             "timeout 5 kafka-console-consumer.sh "
             "--bootstrap-server localhost:9092 "
@@ -255,26 +245,23 @@ in
         )
         assert "test-consumer-group" in result, f"Consumer group not found: {result}"
 
-    with subtest("Verify all team credentials work"):
+    with subtest("Verify multiple team credentials work"):
         for team_num in [1, 5, 10, 15]:
-            team_props = f'''
-                security.protocol=SASL_PLAINTEXT
-                sasl.mechanism=PLAIN
-                sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="team-{team_num}" password="team-{team_num}-secret";
-            '''
             server.succeed(
-                f"echo '{team_props}' > /tmp/team-{team_num}.properties && "
+                f"cat > /tmp/team-{team_num}.properties << 'PROPS'\n"
+                f"security.protocol=SASL_PLAINTEXT\n"
+                f"sasl.mechanism=PLAIN\n"
+                f"sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"team-{team_num}\" password=\"team-{team_num}-secret\";\n"
+                f"PROPS\n"
+            )
+            server.succeed(
                 f"kafka-topics.sh --list "
                 f"--bootstrap-server localhost:9092 "
                 f"--command-config /tmp/team-{team_num}.properties"
             )
 
-    with subtest("Test message with ETL pipeline simulation"):
-        # Simulate the full ETL pipeline:
-        # 1. Produce a user with hotmail email (triggers Team-1 filter)
-        # 2. Consume and verify
-        # 3. Produce corresponding action
-
+    with subtest("Test ETL pipeline simulation"):
+        # Produce a user with hotmail email (triggers Team-1 filter)
         hotmail_user = json.dumps({
             "email": "etl_test@hotmail.com",
             "credit_card_number": "1234567890123456",
@@ -302,7 +289,7 @@ in
             "--producer.config /etc/kafka/team-client.properties"
         )
 
-        # Consume and verify it's a hotmail user
+        # Consume messages and verify hotmail user exists
         result = server.succeed(
             "timeout 10 kafka-console-consumer.sh "
             "--bootstrap-server localhost:9092 "
