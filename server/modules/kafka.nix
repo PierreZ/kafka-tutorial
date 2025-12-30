@@ -86,7 +86,7 @@ in
       "log.retention.hours" = 168; # 7 days
 
       # Log directories
-      "log.dirs" = "/var/lib/kafka/logs";
+      "log.dirs" = [ "/var/lib/kafka/logs" ];
     };
   };
 
