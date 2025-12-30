@@ -41,6 +41,22 @@ EOF
 
 # Start server and wait for services
 server.start()
+server.wait_for_unit("multi-user.target")
+
+# === DEBUG: Print config and logs ===
+print("=== Kafka server.properties ===")
+print(server.succeed("cat /etc/kafka/server.properties"))
+
+print("=== Kafka log directory ===")
+print(server.execute("ls -la /var/lib/kafka/ 2>&1 || echo 'Directory does not exist'")[1])
+
+print("=== Kafka service status ===")
+print(server.execute("systemctl status apache-kafka.service 2>&1 || true")[1])
+
+print("=== Kafka journal logs ===")
+print(server.execute("journalctl -u apache-kafka.service --no-pager -n 100 2>&1 || true")[1])
+
+# Now try to wait for Kafka
 server.wait_for_unit("apache-kafka.service")
 server.wait_for_unit("kafka-create-topics.service")
 
