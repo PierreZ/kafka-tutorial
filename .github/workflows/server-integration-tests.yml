@@ -1,0 +1,55 @@
+name: Server Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/**'
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    name: NixOS VM Integration Tests
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix with KVM
+        uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Run integration tests
+        working-directory: server
+        run: nix build .#checks.x86_64-linux.integration -L
+
+  build-image:
+    name: Build OpenStack Image
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix with KVM
+        uses: DeterminateSystems/determinate-nix-action@v3
+
+      - name: Build OpenStack image
+        working-directory: server
+        run: nix build .#openstack -L
+
+      - name: Upload OpenStack image
+        uses: actions/upload-artifact@v4
+        with:
+          name: kafka-tutorial-openstack-image
+          path: server/result/nixos.qcow2
+          retention-days: 10
