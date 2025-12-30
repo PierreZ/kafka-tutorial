@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an educational Apache Kafka tutorial that teaches message consumption and production through hands-on exercises. The tutorial follows a 5-step ETL pattern: Extract (consume) → Transform (filter) → Load (produce) → Scale (consumer groups).
+This is a 3-hour educational Apache Kafka tutorial designed for engineering students with no prior Kafka knowledge. It teaches message consumption and production through hands-on exercises, following a 5-step ETL pattern: Extract (consume) → Transform (filter) → Load (produce) → Scale (consumer groups).
+
+## Tutorial Setup
+
+- **Students**: Work on their own machines, writing code while following the tutorial at the GitHub Pages rendered version
+- **Kafka cluster**: Deployed via Docker in the cloud, typically on port 443 to avoid firewall restrictions
+- **Instructor**: Displays the TUI (terminal user interface) in class at all times to show real-time message flow
+- **Local Docker setup** (`local-dev/`): Primarily for the instructor to run both the producer and TUI locally for testing purposes
 
 ## Architecture
 
