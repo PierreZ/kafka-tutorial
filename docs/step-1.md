@@ -80,18 +80,11 @@ print(parsed_message["email"])
 
 ## Troubleshooting
 
-### Connection Refused
-- Verify Kafka is running (ask your instructor)
-- Check that `bootstrap_servers` matches the address provided by your instructor
-
-### Authentication Failed
-- Username must be lowercase (e.g., `team-1`, not `Team-1`)
-- Double-check the password with your instructor
-
-### No Messages Appearing
-- Verify the topic name is exactly `new_users`
-- Check that your `group_id` matches your team name
-- Wait a few seconds - the producer sends messages periodically
+| Problem | Solution |
+|---------|----------|
+| Connection Refused | Verify Kafka is running (ask instructor); check `bootstrap_servers` matches provided address |
+| Authentication Failed | Username must be lowercase (e.g., `team-1`, not `Team-1`); verify password with instructor |
+| No Messages Appearing | Verify topic is exactly `new_users`; check `group_id` matches team name; wait a few seconds |
 
 ---
 
