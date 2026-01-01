@@ -50,7 +50,7 @@ impl User {
             credit: (-20..20).fake::<i32>(),
             time_zone: address::en::TimeZone().fake(),
             name: if fake::faker::boolean::en::Boolean(90).fake() {
-                format!("{}", name::en::Name().fake::<String>())
+                name::en::Name().fake::<String>()
             } else {
                 String::from("John Doe")
             },
@@ -106,7 +106,7 @@ pub async fn produce(settings: &Settings) {
                 return;
             }
             _ = interval.tick() => {
-                send_message(&producer, &settings.topic).await;
+                send_message(producer, &settings.topic).await;
             }
 
         }
