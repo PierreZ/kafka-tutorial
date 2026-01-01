@@ -86,6 +86,13 @@ For more details, refer to the [KafkaProducer guide](https://kafka-python.readth
 
 Ask the instructor to confirm they can see your message!
 
+### Bonus Achievements
+
+| Achievement | Unlock | Tip |
+|-------------|--------|-----|
+| ✨ Clean Streak | 50+ messages, 0 errors | Validate JSON before sending |
+| 📈 High Throughput | 100+ valid actions | Keep producing! |
+
 ## Next step
 
 Congratulations, you learned how to produce a message in Kafka 🎉

@@ -63,6 +63,8 @@ With multiple partitions, team members can each consume from different partition
 | 1️⃣ in Progress | Success! You're connected |
 | Team stays ⬜ | Connection issue - see Troubleshooting |
 
+> **⚔️ First Blood**: The first team to connect wins this achievement! Speed matters.
+
 ### Step 2: Parsing the JSON
 Once you see the full Kafka message displayed, it's time to interpret its contents. Each message contains a JSON payload, which can be parsed in Python using the `json` package.
 

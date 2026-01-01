@@ -58,6 +58,30 @@ Ask the instructor to increase the message production rate to simulate higher tr
 
 ---
 
+## Bonus Challenges
+
+### 🔬 Partition Explorer
+
+Try adding a **third consumer** to your group. What happens?
+
+With only 3 partitions in the `new_users` topic, one consumer will sit idle—it has no partition to read from! This teaches a key Kafka lesson: **partitions limit parallelism**. You can't have more active consumers than partitions.
+
+> **Unlock condition**: Have 3+ consumers in your group
+
+### 🚀 Lag Buster
+
+**Consumer lag** is the difference between the latest message produced and the last message your consumer read. High lag means you're falling behind!
+
+Try this experiment:
+1. Stop all your consumers for 30+ seconds
+2. Watch the leaderboard—your lag counter will climb
+3. Restart your consumer and watch it catch up
+4. When lag hits 0, you unlock **Lag Buster**!
+
+> **Unlock condition**: Build up 100+ lag, then consume back to 0
+
+---
+
 Congratulations, you've learned how to distribute and scale your Kafka-based program using Consumer Groups! 🎉
 
 You can now head to [step 5](/kafka-tutorial/docs/step-5.html) to learn about stateful processing!

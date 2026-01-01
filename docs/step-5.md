@@ -141,6 +141,14 @@ This is an advanced challenge - ask your instructor for guidance if you get stuc
 
 ---
 
+## 🏆 Go for Champion!
+
+Completed all 4 step achievements? Now unlock the bonus achievements to become the **first Champion**!
+
+See [Step 0](/kafka-tutorial/docs/step-0.html#bonus-achievements) for the full list.
+
+---
+
 ## Congratulations!
 
 You've completed the Kafka tutorial!
