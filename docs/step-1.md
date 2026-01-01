@@ -40,7 +40,7 @@ With the provided GitPod setup, the boilerplate code is already in place for you
 
 - How many partitions does the topic `new_users` have?
 
-> **Hint:** You can see the partition number in the consumer output (the second number after the topic name). The `new_users` topic has **2 partitions**.
+> **Hint:** Look at the consumer output format: `topic:partition:offset`. The partition number is the second value.
 
 ---
 
@@ -52,7 +52,7 @@ A **partition** is Kafka's unit of parallelism. Each topic is split into one or 
 - **Parallelism**: Different partitions can be consumed in parallel by different consumers
 - **Distribution**: In Step 4, you'll see how Consumer Groups distribute partitions among team members
 
-The `new_users` topic has 2 partitions, which means in Step 4, two team members can each consume from one partition simultaneously.
+With multiple partitions, team members can each consume from different partitions simultaneously in Step 4.
 
 ---
 
@@ -67,12 +67,12 @@ Once you see the full Kafka message displayed, it's time to interpret its conten
 1. Use the `json.loads` function to parse the message value.
 2. To confirm successful parsing, extract and print only the `email` field from the JSON.
 
-Example: 
+Example:
 ```python
 import json
 
-# Assuming `message` contains the JSON payload
-parsed_message = json.loads(message)
+# message.value is bytes, so we need to decode it first
+parsed_message = json.loads(message.value.decode('utf-8'))
 print(parsed_message["email"])
 ```
 

@@ -11,6 +11,41 @@ Now that you’ve parsed your JSON message into a structured format, it’s time
 
 These fields are crucial for generating the next Kafka message, so be sure to include them in your output.
 
+## Filter Examples
+
+Here are some common patterns you'll need:
+
+### String contains (case-insensitive)
+```python
+# Team-1 style: check if email contains "hotmail"
+if "hotmail" in user["email"].lower():
+    # matches!
+```
+
+### String starts with
+```python
+# Team-9 style: check if time_zone starts with "Asia/"
+if user["time_zone"].startswith("Asia/"):
+    # matches!
+```
+
+### Multiple conditions
+```python
+# Team-7 style: premium AND credit > 10
+if user["premium"] == True and user["credit"] > 10:
+    # matches!
+```
+
+### Check multiple values
+```python
+# Team-3 style: industry contains any of these keywords
+keywords = ["Bank", "Financ", "Insur", "Invest", "Account", "Capital"]
+if any(kw in user["industry"] for kw in keywords):
+    # matches!
+```
+
+---
+
 ## Team's criteria
 
 ### Team-1
