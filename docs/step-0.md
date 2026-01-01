@@ -85,6 +85,19 @@ Your instructor displays a real-time leaderboard that tracks your team's progres
 
 > Step 2 (Transform) has no achievement - your filter is verified when 3️⃣ unlocks.
 
+### Bonus Achievements
+
+These unlock as you master Kafka concepts!
+
+| Achievement | Emoji | How to Unlock | Kafka Lesson |
+|-------------|-------|---------------|--------------|
+| **Partition Explorer** | 🔬 | Have 3+ consumers in your group | Partitions limit parallelism—extra consumers sit idle! |
+| **High Throughput** | 📈 | Produce 100+ valid actions | Sustained message production |
+| **Clean Streak** | ✨ | 50+ messages with 0 errors | Validation matters |
+| **First Blood** | ⚔️ | First team to connect | Quick setup wins! |
+| **Lag Buster** | 🚀 | Build up lag, then catch up | Understanding consumer lag |
+| **Champion** | 🏆 | First team to complete ALL achievements | Ultimate goal! |
+
 ### Error Indicators
 
 | Emoji | Error | What Went Wrong |
@@ -94,9 +107,9 @@ Your instructor displays a real-time leaderboard that tracks your team's progres
 
 ### Reading the Leaderboard
 
-- **Progress column**: Shows 1️⃣ 3️⃣ 4️⃣ 5️⃣ for completed steps (⬜ for incomplete)
+- **Achievements column**: Shows 1️⃣ 3️⃣ 4️⃣ 5️⃣ for steps (⬜ for incomplete), then bonus emojis
 - **Errors column**: Shows error counts (e.g., ❌x2)
-- **Team color**: Green (all 4) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
+- **Team color**: Green (all 4 steps) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
 
 ---
 

@@ -32,7 +32,7 @@ impl<'a> LeaderboardWidget<'a> {
     pub fn render(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
         let header = Row::new(vec![
             Cell::from("Team"),
-            Cell::from("Progress"),
+            Cell::from("Achievements"),
             Cell::from("Errors"),
             Cell::from("👥"),
             Cell::from("📤"),
@@ -52,8 +52,8 @@ impl<'a> LeaderboardWidget<'a> {
         let rows: Vec<Row> = sorted_teams
             .iter()
             .map(|team| {
-                // Progress emojis
-                let progress = self.format_progress(team);
+                // All achievements (steps + bonus)
+                let achievements = self.format_all_achievements(team);
 
                 // Error emojis with counts
                 let errors = self.format_errors(team);
@@ -72,7 +72,7 @@ impl<'a> LeaderboardWidget<'a> {
 
                 Row::new(vec![
                     Cell::from(team.team_name.clone()),
-                    Cell::from(progress),
+                    Cell::from(achievements),
                     Cell::from(errors),
                     Cell::from(format!("{}", consumers)),
                     Cell::from(format!("{}", team.action_count)),
@@ -83,7 +83,7 @@ impl<'a> LeaderboardWidget<'a> {
 
         let widths = [
             Constraint::Length(10), // Team
-            Constraint::Length(16), // Progress (4 emojis + spaces)
+            Constraint::Length(32), // Achievements (steps + bonus emojis)
             Constraint::Length(12), // Errors
             Constraint::Length(4),  // 👥
             Constraint::Length(8),  // 📤
@@ -92,23 +92,40 @@ impl<'a> LeaderboardWidget<'a> {
         let table = Table::new(rows, widths).header(header).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" KAFKA TUTORIAL - 1️⃣=Connected 3️⃣=Load 4️⃣=Scaled 5️⃣=Watchlist "),
+                .title(" KAFKA TUTORIAL - Steps: 1️⃣3️⃣4️⃣5️⃣ | Bonus: 🔬📈✨⚔️🚀🏆 "),
         );
 
         frame.render_widget(table, area);
     }
 
-    fn format_progress(&self, team: &TeamState) -> String {
-        let mut progress = String::new();
+    fn format_all_achievements(&self, team: &TeamState) -> String {
+        let mut achievements = String::new();
+
+        // Step achievements (show ⬜ for incomplete)
         for step in AchievementType::all_steps() {
             if team.has_achievement(step) {
-                progress.push_str(step.emoji());
+                achievements.push_str(step.emoji());
             } else {
-                progress.push('⬜');
+                achievements.push('⬜');
             }
-            progress.push(' ');
         }
-        progress.trim_end().to_string()
+
+        // Add separator if team has any bonus achievements
+        let has_bonus = AchievementType::all_bonus()
+            .iter()
+            .any(|a| team.has_achievement(*a));
+        if has_bonus {
+            achievements.push(' ');
+        }
+
+        // Bonus achievements (only show if earned)
+        for bonus in AchievementType::all_bonus() {
+            if team.has_achievement(bonus) {
+                achievements.push_str(bonus.emoji());
+            }
+        }
+
+        achievements
     }
 
     fn format_errors(&self, team: &TeamState) -> String {

@@ -47,6 +47,9 @@ pub struct AppState {
     pub teams: HashMap<String, TeamState>,
     pub consumer_groups: Vec<ConsumerGroupStatus>,
     pub settings: Settings,
+    pub first_blood_awarded: bool,  // Track if FirstBlood has been given
+    pub champion_awarded: bool,     // Track if Champion has been given
+    pub topic_high_watermark: i64,  // Track new_users topic high watermark for lag calculation
 }
 
 impl AppState {
@@ -62,6 +65,9 @@ impl AppState {
             teams,
             consumer_groups: Vec::new(),
             settings,
+            first_blood_awarded: false,
+            champion_awarded: false,
+            topic_high_watermark: 0,
         }
     }
 
@@ -102,6 +108,13 @@ pub async fn run(settings: Settings) -> Result<()> {
         Ok(restored) => {
             let mut state_guard = state.write().await;
             for (team_name, team_state) in restored {
+                // Check if this team had FirstBlood or Champion before restoring
+                if team_state.has_achievement(AchievementType::FirstBlood) {
+                    state_guard.first_blood_awarded = true;
+                }
+                if team_state.has_achievement(AchievementType::Champion) {
+                    state_guard.champion_awarded = true;
+                }
                 state_guard.teams.insert(team_name, team_state);
             }
             info!("State restored successfully");
@@ -153,10 +166,29 @@ pub async fn run(settings: Settings) -> Result<()> {
         loop {
             let statuses = admin::fetch_consumer_group_statuses(&admin).await;
 
+            // Try to fetch high watermark for lag calculation (do this outside the lock)
+            let watermark = admin::fetch_topic_high_watermark(
+                &settings_clone.kafka.brokers,
+                &settings_clone.kafka.username,
+                &settings_clone.kafka.password,
+                &settings_clone.topics.new_users,
+            )
+            .ok();
+
             // Update state and check for infrastructure achievements
             {
                 let mut state_guard = state_clone.write().await;
                 state_guard.consumer_groups = statuses.clone();
+
+                // Update high watermark if we got a new value
+                if let Some(wm) = watermark {
+                    state_guard.topic_high_watermark = wm;
+                }
+                let high_watermark = state_guard.topic_high_watermark;
+
+                // Cache global flags before the loop
+                let mut first_blood_awarded = state_guard.first_blood_awarded;
+                let mut champion_awarded = state_guard.champion_awarded;
 
                 // Check for Connected and Scaled achievements
                 for status in &statuses {
@@ -165,6 +197,14 @@ pub async fn run(settings: Settings) -> Result<()> {
                             // Step 1: Connected
                             if team.unlock_achievement(AchievementType::Connected) {
                                 info!("{} unlocked Connected achievement", status.team_name);
+
+                                // FirstBlood: First team to get Connected
+                                if !first_blood_awarded {
+                                    first_blood_awarded = true;
+                                    team.unlock_achievement(AchievementType::FirstBlood);
+                                    info!("{} unlocked FirstBlood achievement!", status.team_name);
+                                }
+
                                 // Persist state
                                 let team_clone = team.clone();
                                 let topic = settings_clone.topics.scorer_state.clone();
@@ -173,6 +213,7 @@ pub async fn run(settings: Settings) -> Result<()> {
                                     let _ = persist_state(&producer, &topic, &team_clone).await;
                                 });
                             }
+
                             // Step 4: Scaled (2+ consumers)
                             if status.members >= 2
                                 && team.unlock_achievement(AchievementType::Scaled)
@@ -185,9 +226,58 @@ pub async fn run(settings: Settings) -> Result<()> {
                                     let _ = persist_state(&producer, &topic, &team_clone).await;
                                 });
                             }
+
+                            // PartitionExplorer: 3+ consumers (teaches partition limits)
+                            if status.members >= 3
+                                && team.unlock_achievement(AchievementType::PartitionExplorer)
+                            {
+                                info!("{} unlocked PartitionExplorer achievement!", status.team_name);
+                                let team_clone = team.clone();
+                                let topic = settings_clone.topics.scorer_state.clone();
+                                let producer = producer_clone.clone();
+                                tokio::spawn(async move {
+                                    let _ = persist_state(&producer, &topic, &team_clone).await;
+                                });
+                            }
+
+                            // Update lag tracking for LagBuster
+                            let estimated_lag = admin::estimate_team_lag(high_watermark, team.action_count);
+                            team.update_lag(estimated_lag);
+
+                            // LagBuster: Had 100+ lag and now at 0
+                            if team.qualifies_for_lag_buster()
+                                && team.unlock_achievement(AchievementType::LagBuster)
+                            {
+                                info!("{} unlocked LagBuster achievement!", status.team_name);
+                                let team_clone = team.clone();
+                                let topic = settings_clone.topics.scorer_state.clone();
+                                let producer = producer_clone.clone();
+                                tokio::spawn(async move {
+                                    let _ = persist_state(&producer, &topic, &team_clone).await;
+                                });
+                            }
+
+                            // Champion: First team to have all requirements
+                            if !champion_awarded
+                                && team.has_all_champion_requirements()
+                                && team.unlock_achievement(AchievementType::Champion)
+                            {
+                                champion_awarded = true;
+                                info!("{} unlocked Champion achievement! 🏆", status.team_name);
+                                let team_clone = team.clone();
+                                let topic = settings_clone.topics.scorer_state.clone();
+                                let producer = producer_clone.clone();
+                                tokio::spawn(async move {
+                                    let _ = persist_state(&producer, &topic, &team_clone).await;
+                                });
+                            }
                         }
                     }
                 }
+
+                // Update global flags after the loop
+                state_guard.first_blood_awarded = first_blood_awarded;
+                state_guard.champion_awarded = champion_awarded;
             }
 
             tokio::time::sleep(Duration::from_secs(10)).await;
@@ -288,10 +378,27 @@ async fn consume_actions(
                         SimpleValidationResult::Valid { team } => {
                             if let Some(team_state) = state_guard.teams.get_mut(&team) {
                                 team_state.action_count += 1;
+
                                 // Unlock FirstLoad on first valid action
                                 if team_state.unlock_achievement(AchievementType::FirstLoad) {
                                     info!("{} unlocked FirstLoad achievement", team);
                                 }
+
+                                // HighThroughput: 100+ valid actions
+                                if team_state.action_count >= 100
+                                    && team_state.unlock_achievement(AchievementType::HighThroughput)
+                                {
+                                    info!("{} unlocked HighThroughput achievement!", team);
+                                }
+
+                                // CleanStreak: 50+ messages with 0 errors
+                                if team_state.action_count >= 50
+                                    && team_state.total_errors() == 0
+                                    && team_state.unlock_achievement(AchievementType::CleanStreak)
+                                {
+                                    info!("{} unlocked CleanStreak achievement!", team);
+                                }
+
                                 // Persist state
                                 let team_clone = team_state.clone();
                                 let topic = settings.topics.scorer_state.clone();
