@@ -73,6 +73,15 @@ pub async fn restore_states(
                 if let Some(payload) = message.payload() {
                     match serde_json::from_slice::<TeamState>(payload) {
                         Ok(state) => {
+                            // Validate team name before accepting
+                            if state.team_name.is_empty() {
+                                warn!("Skipping state with empty team name");
+                                continue;
+                            }
+                            if !state.team_name.starts_with("team-") {
+                                warn!("Skipping invalid team name: {}", state.team_name);
+                                continue;
+                            }
                             debug!("Restored state for team: {}", state.team_name);
                             states.insert(state.team_name.clone(), state);
                         }

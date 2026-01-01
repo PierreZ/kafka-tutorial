@@ -4,6 +4,9 @@ mod state;
 mod ui;
 mod validation;
 
+/// Number of teams in the tutorial (team-1 through team-15)
+pub const NUM_TEAMS: u32 = 15;
+
 use anyhow::Result;
 use clap::Parser;
 use tracing::info;

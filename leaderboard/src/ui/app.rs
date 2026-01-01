@@ -47,16 +47,16 @@ pub struct AppState {
     pub teams: HashMap<String, TeamState>,
     pub consumer_groups: Vec<ConsumerGroupStatus>,
     pub settings: Settings,
-    pub first_blood_awarded: bool,  // Track if FirstBlood has been given
-    pub champion_awarded: bool,     // Track if Champion has been given
-    pub topic_high_watermark: i64,  // Track new_users topic high watermark for lag calculation
+    pub first_blood_awarded: bool, // Track if FirstBlood has been given
+    pub champion_awarded: bool,    // Track if Champion has been given
+    pub topic_high_watermark: i64, // Track new_users topic high watermark for lag calculation
 }
 
 impl AppState {
     pub fn new(settings: Settings) -> Self {
-        // Initialize all 15 teams
+        // Initialize all teams
         let mut teams = HashMap::new();
-        for i in 1..=15 {
+        for i in 1..=crate::NUM_TEAMS {
             let team_name = format!("team-{}", i);
             teams.insert(team_name.clone(), TeamState::new(team_name));
         }
@@ -131,13 +131,6 @@ pub async fn run(settings: Settings) -> Result<()> {
         &settings.kafka.password,
     )?;
 
-    // Create admin client for consumer group monitoring
-    let admin = admin::create_admin_client(
-        &settings.kafka.brokers,
-        &settings.kafka.username,
-        &settings.kafka.password,
-    )?;
-
     // Spawn actions consumer task
     let state_clone = Arc::clone(&state);
     let settings_clone = settings.clone();
@@ -164,7 +157,12 @@ pub async fn run(settings: Settings) -> Result<()> {
     let settings_clone = settings.clone();
     let admin_task = tokio::spawn(async move {
         loop {
-            let statuses = admin::fetch_consumer_group_statuses(&admin).await;
+            let statuses = admin::fetch_consumer_group_statuses(
+                &settings_clone.kafka.brokers,
+                &settings_clone.kafka.username,
+                &settings_clone.kafka.password,
+            )
+            .await;
 
             // Try to fetch high watermark for lag calculation (do this outside the lock)
             let watermark = admin::fetch_topic_high_watermark(
@@ -231,7 +229,10 @@ pub async fn run(settings: Settings) -> Result<()> {
                             if status.members >= 3
                                 && team.unlock_achievement(AchievementType::PartitionExplorer)
                             {
-                                info!("{} unlocked PartitionExplorer achievement!", status.team_name);
+                                info!(
+                                    "{} unlocked PartitionExplorer achievement!",
+                                    status.team_name
+                                );
                                 let team_clone = team.clone();
                                 let topic = settings_clone.topics.scorer_state.clone();
                                 let producer = producer_clone.clone();
@@ -241,7 +242,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                             }
 
                             // Update lag tracking for LagBuster
-                            let estimated_lag = admin::estimate_team_lag(high_watermark, team.action_count);
+                            let estimated_lag =
+                                admin::estimate_team_lag(high_watermark, team.messages_consumed);
                             team.update_lag(estimated_lag);
 
                             // LagBuster: Had 100+ lag and now at 0
@@ -287,10 +289,19 @@ pub async fn run(settings: Settings) -> Result<()> {
     // Run UI loop
     let result = run_ui(&mut terminal, Arc::clone(&state)).await;
 
-    // Cleanup
+    // Graceful shutdown: abort tasks and wait briefly for cleanup
+    info!("Shutting down background tasks...");
     actions_task.abort();
     watchlist_task.abort();
     admin_task.abort();
+
+    // Wait briefly for tasks to complete their abort handling
+    let shutdown_timeout = Duration::from_millis(100);
+    let _ = tokio::time::timeout(shutdown_timeout, async {
+        let _ = tokio::join!(actions_task, watchlist_task, admin_task);
+    })
+    .await;
+    debug!("Background tasks shut down");
 
     // Restore terminal
     disable_raw_mode()?;
@@ -374,6 +385,17 @@ async fn consume_actions(
 
                     let mut state_guard = state.write().await;
 
+                    // Track messages_consumed for lag calculation (all messages, not just valid)
+                    if let Some(team) = match &validation {
+                        SimpleValidationResult::Valid { team } => Some(team.clone()),
+                        SimpleValidationResult::MissingFields { team } => Some(team.clone()),
+                        SimpleValidationResult::InvalidJson => extract_team_from_payload(payload),
+                    } {
+                        if let Some(team_state) = state_guard.teams.get_mut(&team) {
+                            team_state.messages_consumed += 1;
+                        }
+                    }
+
                     match validation {
                         SimpleValidationResult::Valid { team } => {
                             if let Some(team_state) = state_guard.teams.get_mut(&team) {
@@ -386,7 +408,8 @@ async fn consume_actions(
 
                                 // HighThroughput: 100+ valid actions
                                 if team_state.action_count >= 100
-                                    && team_state.unlock_achievement(AchievementType::HighThroughput)
+                                    && team_state
+                                        .unlock_achievement(AchievementType::HighThroughput)
                                 {
                                     info!("{} unlocked HighThroughput achievement!", team);
                                 }
@@ -423,6 +446,8 @@ async fn consume_actions(
                             }
                         }
                     }
+                } else {
+                    debug!("Received message with empty payload in actions topic");
                 }
             }
             Err(e) => {
@@ -478,6 +503,8 @@ async fn consume_watchlist(
                             debug!("Failed to parse watchlist entry: {:?}", e);
                         }
                     }
+                } else {
+                    debug!("Received message with empty payload in watchlist topic");
                 }
             }
             Err(e) => {

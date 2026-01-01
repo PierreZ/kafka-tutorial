@@ -14,6 +14,8 @@ pub struct TeamState {
     pub max_lag_seen: i64, // Peak lag ever observed (for LagBuster)
     #[serde(default)]
     pub current_lag: i64, // Current consumer lag
+    #[serde(default)]
+    pub messages_consumed: u64, // Total messages consumed from new_users topic (for accurate lag)
 }
 
 impl TeamState {
@@ -26,6 +28,7 @@ impl TeamState {
             error_counts: HashMap::new(),
             max_lag_seen: 0,
             current_lag: 0,
+            messages_consumed: 0,
         }
     }
 
@@ -42,7 +45,8 @@ impl TeamState {
     /// Record an error (increments count and marks as encountered)
     pub fn record_error(&mut self, error: AchievementType) {
         if error.is_error() {
-            *self.error_counts.entry(error).or_insert(0) += 1;
+            let count = self.error_counts.entry(error).or_insert(0);
+            *count = count.saturating_add(1);
             self.achievements.insert(error);
         }
     }
@@ -70,9 +74,10 @@ impl TeamState {
         }
     }
 
-    /// Check if team qualifies for LagBuster (had 100+ lag, now at 0)
+    /// Check if team qualifies for LagBuster (had 100+ lag, now caught up)
+    /// Uses <= 5 threshold instead of == 0 to handle timing fluctuations
     pub fn qualifies_for_lag_buster(&self) -> bool {
-        self.max_lag_seen >= 100 && self.current_lag == 0
+        self.max_lag_seen >= 100 && self.current_lag <= 5
     }
 
     /// Check if team has all achievements required for Champion
@@ -183,9 +188,15 @@ mod tests {
         state.update_lag(150);
         assert!(!state.qualifies_for_lag_buster()); // Still has lag
 
-        // Catch up
+        // Catch up (threshold is <= 5)
+        state.update_lag(5);
+        assert!(state.qualifies_for_lag_buster()); // Qualifies at threshold
+
         state.update_lag(0);
-        assert!(state.qualifies_for_lag_buster()); // Now qualifies!
+        assert!(state.qualifies_for_lag_buster()); // Also qualifies at 0
+
+        state.update_lag(6);
+        assert!(!state.qualifies_for_lag_buster()); // Above threshold, doesn't qualify
     }
 
     #[test]
