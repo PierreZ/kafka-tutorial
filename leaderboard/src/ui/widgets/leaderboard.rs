@@ -104,7 +104,7 @@ impl<'a> LeaderboardWidget<'a> {
             if team.has_achievement(step) {
                 progress.push_str(step.emoji());
             } else {
-                progress.push_str("⬜");
+                progress.push('⬜');
             }
             progress.push(' ');
         }

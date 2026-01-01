@@ -174,16 +174,16 @@ pub async fn run(settings: Settings) -> Result<()> {
                                 });
                             }
                             // Step 4: Scaled (2+ consumers)
-                            if status.members >= 2 {
-                                if team.unlock_achievement(AchievementType::Scaled) {
-                                    info!("{} unlocked Scaled achievement", status.team_name);
-                                    let team_clone = team.clone();
-                                    let topic = settings_clone.topics.scorer_state.clone();
-                                    let producer = producer_clone.clone();
-                                    tokio::spawn(async move {
-                                        let _ = persist_state(&producer, &topic, &team_clone).await;
-                                    });
-                                }
+                            if status.members >= 2
+                                && team.unlock_achievement(AchievementType::Scaled)
+                            {
+                                info!("{} unlocked Scaled achievement", status.team_name);
+                                let team_clone = team.clone();
+                                let topic = settings_clone.topics.scorer_state.clone();
+                                let producer = producer_clone.clone();
+                                tokio::spawn(async move {
+                                    let _ = persist_state(&producer, &topic, &team_clone).await;
+                                });
                             }
                         }
                     }
