@@ -1,5 +1,5 @@
 {
-  description = "A dev environment for the Kafka producer";
+  description = "A dev environment for the Kafka tutorial workspace";
   inputs = {
     nixpkgs.url = "nixpkgs";
     rust-overlay.url = "github:oxalica/rust-overlay";

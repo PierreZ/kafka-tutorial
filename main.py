@@ -16,7 +16,7 @@ SASL_PASSWORD= "password"
 consumer = KafkaConsumer(CONSUME_TOPIC, 
                          group_id=TEAM_NAME, 
                          client_id=TEAM_NAME,
-                         security_protocol="SASL_SSL",
+                         security_protocol="SASL_PLAINTEXT",
                          sasl_mechanism="PLAIN",
                          sasl_plain_username=SASL_USERNAME,
                          sasl_plain_password=SASL_PASSWORD,
@@ -25,3 +25,16 @@ consumer = KafkaConsumer(CONSUME_TOPIC,
 for message in consumer:
     print ("%s:%d:%d: value=%s" % (message.topic, message.partition,
                                           message.offset, message.value))
+
+    # === Step 1: Parse the JSON ===
+    # TODO: Decode and parse the message
+    # parsed = json.loads(message.value.decode('utf-8'))
+
+    # === Step 2: Apply your team's filter ===
+    # TODO: Check if the user matches your team's criteria
+    # if matches_filter(parsed):
+    #     ...
+
+    # === Step 3: Produce to actions topic ===
+    # TODO: Create a producer and send matching users
+    # See step-3 docs for KafkaProducer configuration

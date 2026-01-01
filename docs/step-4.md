@@ -47,6 +47,15 @@ Ask the instructor to increase the message production rate to simulate higher tr
 - Consumer Groups allow you to scale your application horizontally by adding more consumers.
 - Kafka automatically balances partitions among consumers within a group, making it resilient to failures and capable of handling increased load.
 
-🎉 Congratulations! You’ve learned how to distribute and scale your Kafka-based program using Consumer Groups. 
+---
 
-You’re ready to move on to more advanced concepts!
+## Achievements
+
+Complete this step to unlock:
+- **Scaled** (50 pts): Have 2 or more consumers active in your team's consumer group
+
+---
+
+Congratulations, you've learned how to distribute and scale your Kafka-based program using Consumer Groups! 🎉
+
+You can now head to [step 5](/kafka-tutorial/docs/step-5.html) to learn about stateful processing!

@@ -1,0 +1,22 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Check formatting
+        run: nix develop --command cargo fmt --all -- --check
+      - name: Clippy
+        run: nix develop --command cargo clippy --workspace -- -D warnings
+      - name: Build
+        run: nix develop --command cargo build --workspace
+      - name: Test
+        run: nix develop --command cargo test --workspace
