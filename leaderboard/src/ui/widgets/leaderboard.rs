@@ -1,23 +1,30 @@
 use crate::state::achievements::AchievementType;
 use crate::state::team::{ConsumerGroupStatus, TeamState};
 use ratatui::{
-    layout::Constraint,
+    layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Row, Table},
+    widgets::{Block, Borders, Cell, Row, Table, TableState},
     Frame,
 };
 use std::collections::HashMap;
+use std::time::Instant;
 
 pub struct LeaderboardWidget<'a> {
     teams: &'a [TeamState],
     consumer_groups: &'a HashMap<String, u32>, // team_name -> member count
+    last_update: Option<Instant>,
 }
 
 impl<'a> LeaderboardWidget<'a> {
-    pub fn new(teams: &'a [TeamState], consumer_groups: &'a HashMap<String, u32>) -> Self {
+    pub fn new(
+        teams: &'a [TeamState],
+        consumer_groups: &'a HashMap<String, u32>,
+        last_update: Option<Instant>,
+    ) -> Self {
         Self {
             teams,
             consumer_groups,
+            last_update,
         }
     }
 
@@ -29,7 +36,8 @@ impl<'a> LeaderboardWidget<'a> {
             .collect()
     }
 
-    pub fn render(&self, frame: &mut Frame, area: ratatui::layout::Rect) {
+    /// Render with stateful selection support
+    pub fn render_stateful(&self, frame: &mut Frame, area: Rect, table_state: &mut TableState) {
         let header = Row::new(vec![
             Cell::from("Team"),
             Cell::from("Achievements"),
@@ -40,16 +48,9 @@ impl<'a> LeaderboardWidget<'a> {
         .style(Style::default().add_modifier(Modifier::BOLD))
         .height(1);
 
-        // Sort teams by step count (descending), then by action count, then by name
-        let mut sorted_teams: Vec<_> = self.teams.iter().collect();
-        sorted_teams.sort_by(|a, b| {
-            b.step_count()
-                .cmp(&a.step_count())
-                .then_with(|| b.action_count.cmp(&a.action_count))
-                .then_with(|| a.team_name.cmp(&b.team_name))
-        });
-
-        let rows: Vec<Row> = sorted_teams
+        // Teams should already be sorted by caller
+        let rows: Vec<Row> = self
+            .teams
             .iter()
             .map(|team| {
                 // All achievements (steps + bonus)
@@ -89,25 +90,48 @@ impl<'a> LeaderboardWidget<'a> {
             Constraint::Length(8),  // 📤
         ];
 
-        let table = Table::new(rows, widths).header(header).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" KAFKA TUTORIAL - Steps: 1️⃣3️⃣4️⃣5️⃣ | Bonus: 🔬📈✨⚔️🚀🏆 "),
-        );
+        let title = self.build_title();
 
-        frame.render_widget(table, area);
+        let table = Table::new(rows, widths)
+            .header(header)
+            .block(Block::default().borders(Borders::ALL).title(title))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+
+        frame.render_stateful_widget(table, area, table_state);
+    }
+
+    fn build_title(&self) -> String {
+        let freshness = match self.last_update {
+            Some(instant) => {
+                let elapsed = instant.elapsed().as_secs();
+                if elapsed < 2 {
+                    "LIVE".to_string()
+                } else if elapsed < 60 {
+                    format!("{}s ago", elapsed)
+                } else {
+                    format!("{}m ago", elapsed / 60)
+                }
+            }
+            None => "Connecting...".to_string(),
+        };
+
+        format!(
+            " KAFKA TUTORIAL - Steps: 1\u{FE0F}\u{20E3}3\u{FE0F}\u{20E3}4\u{FE0F}\u{20E3}5\u{FE0F}\u{20E3} | Bonus: 🔬📈✨⚔️🚀🏆 | {} ",
+            freshness
+        )
     }
 
     fn format_all_achievements(&self, team: &TeamState) -> String {
         let mut achievements = String::new();
 
-        // Step achievements (show ⬜ for incomplete)
+        // Step achievements (always show step number)
         for step in AchievementType::all_steps() {
-            if team.has_achievement(step) {
-                achievements.push_str(step.emoji());
-            } else {
-                achievements.push('⬜');
-            }
+            achievements.push_str(step.emoji());
         }
 
         // Add separator if team has any bonus achievements

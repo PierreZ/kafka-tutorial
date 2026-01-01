@@ -7,7 +7,7 @@ use crate::validation::rules::{
     extract_team_from_payload, validate_action_simple, SimpleValidationResult,
 };
 
-use super::widgets::LeaderboardWidget;
+use super::widgets::{HelpWidget, LeaderboardWidget, TeamDetailWidget};
 
 use anyhow::Result;
 use crossterm::{
@@ -19,6 +19,7 @@ use futures::StreamExt;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
+    widgets::TableState,
     Frame, Terminal,
 };
 use rdkafka::consumer::Consumer;
@@ -27,9 +28,78 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
+
+/// Current view mode for the UI
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewMode {
+    Leaderboard,
+    TeamDetail,
+    Help,
+}
+
+/// UI-specific state for navigation and display modes
+pub struct UiState {
+    /// Currently selected row index
+    pub selected_row: Option<usize>,
+    /// Current view mode
+    pub view_mode: ViewMode,
+    /// Last time data was updated from Kafka
+    pub last_data_update: Option<Instant>,
+    /// Table state for StatefulWidget rendering
+    pub table_state: TableState,
+}
+
+impl UiState {
+    pub fn new() -> Self {
+        Self {
+            selected_row: None,
+            view_mode: ViewMode::Leaderboard,
+            last_data_update: None,
+            table_state: TableState::default(),
+        }
+    }
+
+    pub fn move_selection_up(&mut self, max: usize) {
+        if max == 0 {
+            return;
+        }
+        let new_index = match self.selected_row {
+            Some(i) if i > 0 => i - 1,
+            Some(_) => max - 1, // Wrap to end
+            None => 0,          // Start at top
+        };
+        self.selected_row = Some(new_index);
+        self.table_state.select(Some(new_index));
+    }
+
+    pub fn move_selection_down(&mut self, max: usize) {
+        if max == 0 {
+            return;
+        }
+        let new_index = match self.selected_row {
+            Some(i) if i < max - 1 => i + 1,
+            Some(_) => 0, // Wrap to start
+            None => 0,    // Start at top
+        };
+        self.selected_row = Some(new_index);
+        self.table_state.select(Some(new_index));
+    }
+
+    pub fn select_first(&mut self) {
+        self.selected_row = Some(0);
+        self.table_state.select(Some(0));
+    }
+
+    pub fn select_last(&mut self, max: usize) {
+        if max > 0 {
+            self.selected_row = Some(max - 1);
+            self.table_state.select(Some(max - 1));
+        }
+    }
+}
 
 /// Watchlist entry from students
 #[derive(Debug, Clone, Deserialize)]
@@ -84,6 +154,145 @@ impl AppState {
     }
 }
 
+/// Run in demo mode without Kafka (for UI testing)
+pub async fn run_demo() -> Result<()> {
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Create demo state with sample data
+    let state = Arc::new(RwLock::new(create_demo_state()));
+    let ui_state = Arc::new(RwLock::new(UiState::new()));
+
+    // Set initial last update time
+    {
+        let mut ui_guard = ui_state.write().await;
+        ui_guard.last_data_update = Some(Instant::now());
+    }
+
+    // Run UI loop only (no Kafka tasks)
+    let result = run_ui(&mut terminal, Arc::clone(&state), Arc::clone(&ui_state)).await;
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    result
+}
+
+fn create_demo_state() -> AppState {
+    use crate::config::{AchievementSettings, KafkaSettings, ScoringSettings, Settings, TopicSettings};
+
+    let settings = Settings {
+        kafka: KafkaSettings {
+            brokers: "demo".to_string(),
+            username: "demo".to_string(),
+            password: "demo".to_string(),
+            consumer_group: "demo".to_string(),
+        },
+        topics: TopicSettings {
+            new_users: "new_users".to_string(),
+            actions: "actions".to_string(),
+            watchlist: "watchlist".to_string(),
+            scorer_state: "scorer_state".to_string(),
+        },
+        scoring: ScoringSettings::default(),
+        achievements: AchievementSettings::default(),
+    };
+
+    let mut app_state = AppState::new(settings);
+
+    // Add demo data to some teams
+    if let Some(team) = app_state.teams.get_mut("team-1") {
+        team.unlock_achievement(AchievementType::Connected);
+        team.unlock_achievement(AchievementType::FirstLoad);
+        team.unlock_achievement(AchievementType::Scaled);
+        team.unlock_achievement(AchievementType::WatchlistDone);
+        team.unlock_achievement(AchievementType::HighThroughput);
+        team.unlock_achievement(AchievementType::CleanStreak);
+        team.unlock_achievement(AchievementType::FirstBlood);
+        team.action_count = 150;
+        team.watchlist_count = 5;
+    }
+
+    if let Some(team) = app_state.teams.get_mut("team-2") {
+        team.unlock_achievement(AchievementType::Connected);
+        team.unlock_achievement(AchievementType::FirstLoad);
+        team.unlock_achievement(AchievementType::Scaled);
+        team.unlock_achievement(AchievementType::PartitionExplorer);
+        team.action_count = 85;
+        team.record_error(AchievementType::ParseError);
+        team.record_error(AchievementType::ParseError);
+    }
+
+    if let Some(team) = app_state.teams.get_mut("team-3") {
+        team.unlock_achievement(AchievementType::Connected);
+        team.unlock_achievement(AchievementType::FirstLoad);
+        team.action_count = 42;
+        team.record_error(AchievementType::MissingFields);
+    }
+
+    if let Some(team) = app_state.teams.get_mut("team-4") {
+        team.unlock_achievement(AchievementType::Connected);
+        team.action_count = 10;
+    }
+
+    if let Some(team) = app_state.teams.get_mut("team-5") {
+        team.unlock_achievement(AchievementType::Connected);
+        team.unlock_achievement(AchievementType::FirstLoad);
+        team.unlock_achievement(AchievementType::Scaled);
+        team.unlock_achievement(AchievementType::WatchlistDone);
+        team.unlock_achievement(AchievementType::LagBuster);
+        team.action_count = 75;
+        team.watchlist_count = 3;
+        team.max_lag_seen = 150;
+    }
+
+    // Add consumer group statuses for demo
+    app_state.consumer_groups = vec![
+        ConsumerGroupStatus {
+            team_name: "team-1".to_string(),
+            state: GroupState::Active,
+            members: 2,
+            lag: 0,
+        },
+        ConsumerGroupStatus {
+            team_name: "team-2".to_string(),
+            state: GroupState::Active,
+            members: 3,
+            lag: 5,
+        },
+        ConsumerGroupStatus {
+            team_name: "team-3".to_string(),
+            state: GroupState::Active,
+            members: 1,
+            lag: 12,
+        },
+        ConsumerGroupStatus {
+            team_name: "team-4".to_string(),
+            state: GroupState::Active,
+            members: 1,
+            lag: 50,
+        },
+        ConsumerGroupStatus {
+            team_name: "team-5".to_string(),
+            state: GroupState::Active,
+            members: 2,
+            lag: 0,
+        },
+    ];
+
+    app_state
+}
+
 pub async fn run(settings: Settings) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
@@ -94,6 +303,7 @@ pub async fn run(settings: Settings) -> Result<()> {
 
     // Initialize shared state
     let state = Arc::new(RwLock::new(AppState::new(settings.clone())));
+    let ui_state = Arc::new(RwLock::new(UiState::new()));
 
     // Try to restore state from Kafka
     info!("Attempting to restore state from Kafka...");
@@ -212,8 +422,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                                 });
                             }
 
-                            // Step 4: Scaled (2+ consumers)
-                            if status.members >= 2
+                            // Step 4: Scaled (configurable consumers, default 2)
+                            if status.members >= settings_clone.achievements.scaled_members
                                 && team.unlock_achievement(AchievementType::Scaled)
                             {
                                 info!("{} unlocked Scaled achievement", status.team_name);
@@ -225,8 +435,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                                 });
                             }
 
-                            // PartitionExplorer: 3+ consumers (teaches partition limits)
-                            if status.members >= 3
+                            // PartitionExplorer: configurable consumers (default 3, teaches partition limits)
+                            if status.members >= settings_clone.achievements.partition_explorer_members
                                 && team.unlock_achievement(AchievementType::PartitionExplorer)
                             {
                                 info!(
@@ -246,8 +456,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                                 admin::estimate_team_lag(high_watermark, team.messages_consumed);
                             team.update_lag(estimated_lag);
 
-                            // LagBuster: Had 100+ lag and now at 0
-                            if team.qualifies_for_lag_buster()
+                            // LagBuster: Had configurable lag (default 100) and now caught up
+                            if team.qualifies_for_lag_buster(settings_clone.achievements.lag_buster_threshold)
                                 && team.unlock_achievement(AchievementType::LagBuster)
                             {
                                 info!("{} unlocked LagBuster achievement!", status.team_name);
@@ -287,7 +497,7 @@ pub async fn run(settings: Settings) -> Result<()> {
     });
 
     // Run UI loop
-    let result = run_ui(&mut terminal, Arc::clone(&state)).await;
+    let result = run_ui(&mut terminal, Arc::clone(&state), Arc::clone(&ui_state)).await;
 
     // Graceful shutdown: abort tasks and wait briefly for cleanup
     info!("Shutting down background tasks...");
@@ -318,6 +528,7 @@ pub async fn run(settings: Settings) -> Result<()> {
 async fn run_ui(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     state: Arc<RwLock<AppState>>,
+    ui_state: Arc<RwLock<UiState>>,
 ) -> Result<()> {
     let tick_rate = Duration::from_millis(250);
 
@@ -325,16 +536,60 @@ async fn run_ui(
         // Draw UI
         {
             let state_guard = state.read().await;
-            terminal.draw(|f| draw_ui(f, &state_guard))?;
+            let mut ui_guard = ui_state.write().await;
+            terminal.draw(|f| draw_ui(f, &state_guard, &mut ui_guard))?;
         }
 
         // Handle input with timeout
         if event::poll(tick_rate)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                        _ => {}
+                    let mut ui_guard = ui_state.write().await;
+                    let team_count = {
+                        let state_guard = state.read().await;
+                        state_guard.teams.len()
+                    };
+
+                    match ui_guard.view_mode {
+                        ViewMode::Leaderboard => match key.code {
+                            KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                            KeyCode::Up | KeyCode::Char('k') => {
+                                ui_guard.move_selection_up(team_count);
+                            }
+                            KeyCode::Down | KeyCode::Char('j') => {
+                                ui_guard.move_selection_down(team_count);
+                            }
+                            KeyCode::Enter => {
+                                if ui_guard.selected_row.is_some() {
+                                    ui_guard.view_mode = ViewMode::TeamDetail;
+                                }
+                            }
+                            KeyCode::Char('h') | KeyCode::Char('?') => {
+                                ui_guard.view_mode = ViewMode::Help;
+                            }
+                            KeyCode::Home => {
+                                ui_guard.select_first();
+                            }
+                            KeyCode::End => {
+                                ui_guard.select_last(team_count);
+                            }
+                            _ => {}
+                        },
+                        ViewMode::TeamDetail => match key.code {
+                            KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => {
+                                ui_guard.view_mode = ViewMode::Leaderboard;
+                            }
+                            _ => {}
+                        },
+                        ViewMode::Help => match key.code {
+                            KeyCode::Esc
+                            | KeyCode::Char('h')
+                            | KeyCode::Char('?')
+                            | KeyCode::Char('q') => {
+                                ui_guard.view_mode = ViewMode::Leaderboard;
+                            }
+                            _ => {}
+                        },
                     }
                 }
             }
@@ -342,7 +597,7 @@ async fn run_ui(
     }
 }
 
-fn draw_ui(f: &mut Frame, state: &AppState) {
+fn draw_ui(f: &mut Frame, state: &AppState, ui_state: &mut UiState) {
     let size = f.area();
 
     // Simple layout: full-width table
@@ -354,10 +609,30 @@ fn draw_ui(f: &mut Frame, state: &AppState) {
     // Build consumer groups map
     let consumer_map = LeaderboardWidget::build_consumer_map(&state.consumer_groups);
 
-    // Render leaderboard table
+    // Render leaderboard table with selection
     let sorted_teams = state.get_sorted_teams();
-    let leaderboard = LeaderboardWidget::new(&sorted_teams, &consumer_map);
-    leaderboard.render(f, chunks[0]);
+    let leaderboard =
+        LeaderboardWidget::new(&sorted_teams, &consumer_map, ui_state.last_data_update);
+    leaderboard.render_stateful(f, chunks[0], &mut ui_state.table_state);
+
+    // Render overlays based on view mode
+    match ui_state.view_mode {
+        ViewMode::Help => {
+            HelpWidget::render(f, size);
+        }
+        ViewMode::TeamDetail => {
+            if let Some(selected) = ui_state.selected_row {
+                if let Some(team) = sorted_teams.get(selected) {
+                    let consumer_status = state
+                        .consumer_groups
+                        .iter()
+                        .find(|s| s.team_name == team.team_name);
+                    TeamDetailWidget::new(team, consumer_status).render(f, size);
+                }
+            }
+        }
+        ViewMode::Leaderboard => {}
+    }
 }
 
 async fn consume_actions(
@@ -400,23 +675,23 @@ async fn consume_actions(
                         SimpleValidationResult::Valid { team } => {
                             if let Some(team_state) = state_guard.teams.get_mut(&team) {
                                 team_state.action_count += 1;
+                                team_state.increment_clean_streak();
 
                                 // Unlock FirstLoad on first valid action
                                 if team_state.unlock_achievement(AchievementType::FirstLoad) {
                                     info!("{} unlocked FirstLoad achievement", team);
                                 }
 
-                                // HighThroughput: 100+ valid actions
-                                if team_state.action_count >= 100
+                                // HighThroughput: configurable valid actions (default 100)
+                                if team_state.action_count >= settings.achievements.high_throughput_threshold
                                     && team_state
                                         .unlock_achievement(AchievementType::HighThroughput)
                                 {
                                     info!("{} unlocked HighThroughput achievement!", team);
                                 }
 
-                                // CleanStreak: 50+ messages with 0 errors
-                                if team_state.action_count >= 50
-                                    && team_state.total_errors() == 0
+                                // CleanStreak: configurable consecutive valid messages (default 50)
+                                if team_state.clean_streak_count >= settings.achievements.clean_streak_threshold
                                     && team_state.unlock_achievement(AchievementType::CleanStreak)
                                 {
                                     info!("{} unlocked CleanStreak achievement!", team);

@@ -133,10 +133,10 @@ pub fn fetch_topic_high_watermark(
     let mut total_high = 0i64;
     for partition in 0..partition_count as i32 {
         match consumer.fetch_watermarks(topic, partition, timeout) {
-            Ok((low, high)) => {
+            Ok((_low, high)) => {
                 debug!(
                     "Topic {} partition {}: low={}, high={}",
-                    topic, partition, low, high
+                    topic, partition, _low, high
                 );
                 total_high += high;
             }

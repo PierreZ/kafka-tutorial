@@ -19,6 +19,10 @@ struct Args {
     /// Path to configuration file
     #[arg(short, long, default_value = "config.toml")]
     config: String,
+
+    /// Run in demo mode (no Kafka required)
+    #[arg(long)]
+    demo: bool,
 }
 
 #[tokio::main]
@@ -33,6 +37,12 @@ async fn main() -> Result<()> {
         .init();
 
     let args = Args::parse();
+
+    if args.demo {
+        info!("Running in demo mode (no Kafka connection)");
+        return ui::run_demo().await;
+    }
+
     info!("Loading configuration from: {}", args.config);
 
     let settings = config::Settings::from(&args.config)?;

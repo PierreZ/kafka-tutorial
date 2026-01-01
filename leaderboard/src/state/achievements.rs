@@ -27,10 +27,11 @@ impl AchievementType {
     /// Get the emoji for this achievement
     pub fn emoji(&self) -> &'static str {
         match self {
-            AchievementType::Connected => "1️⃣",
-            AchievementType::FirstLoad => "3️⃣",
-            AchievementType::Scaled => "4️⃣",
-            AchievementType::WatchlistDone => "5️⃣",
+            // Keycap digits: digit + U+FE0F (variation selector) + U+20E3 (enclosing keycap)
+            AchievementType::Connected => "1\u{FE0F}\u{20E3}",
+            AchievementType::FirstLoad => "3\u{FE0F}\u{20E3}",
+            AchievementType::Scaled => "4\u{FE0F}\u{20E3}",
+            AchievementType::WatchlistDone => "5\u{FE0F}\u{20E3}",
             AchievementType::ParseError => "❌",
             AchievementType::MissingFields => "❓",
             AchievementType::PartitionExplorer => "🔬",
@@ -57,6 +58,24 @@ impl AchievementType {
             AchievementType::FirstBlood => "First Blood",
             AchievementType::LagBuster => "Lag Buster",
             AchievementType::Champion => "Champion",
+        }
+    }
+
+    /// Get a description explaining how to earn this achievement
+    pub fn description(&self) -> &'static str {
+        match self {
+            AchievementType::Connected => "Start your consumer and join the consumer group",
+            AchievementType::FirstLoad => "Successfully produce your first valid action message",
+            AchievementType::Scaled => "Run 2+ consumers in your group (teaches parallelism)",
+            AchievementType::WatchlistDone => "Produce a message to the watchlist topic",
+            AchievementType::ParseError => "Produced invalid JSON (fix your serialization!)",
+            AchievementType::MissingFields => "Produced JSON with missing required fields",
+            AchievementType::PartitionExplorer => "Run 3+ consumers (teaches partition limits)",
+            AchievementType::HighThroughput => "Produce 100+ valid action messages",
+            AchievementType::CleanStreak => "Produce 50+ consecutive messages with zero errors",
+            AchievementType::FirstBlood => "First team to get the Connected achievement",
+            AchievementType::LagBuster => "Build up 100+ lag, then consume it all",
+            AchievementType::Champion => "First team to earn all other achievements",
         }
     }
 
