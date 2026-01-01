@@ -72,46 +72,31 @@ This helps you understand expected match rates - if your filter never matches, d
 
 ## Leaderboard & Achievements
 
-Your instructor has a real-time leaderboard that tracks your team's progress! Earn points by correctly processing messages and unlock achievements along the way.
+Your instructor displays a real-time leaderboard that tracks your team's progress!
 
-### How Scoring Works
+### Step Achievements
 
-Every action your team produces to the `actions` topic is validated:
-- ✅ Valid JSON with all required fields (`customer`, `type`, `reason`, `team`)
-- ✅ User exists in the `new_users` topic
-- ✅ User matches your team's filter criteria
-- ✅ Correct `type` and `reason` values
-- ✅ No duplicate actions
+| Step | Achievement | Emoji | How to Unlock |
+|------|-------------|-------|---------------|
+| 1 | **Connected** | 1️⃣ | Consumer group becomes active |
+| 3 | **First Load** | 3️⃣ | Produce first valid action message |
+| 4 | **Scaled** | 4️⃣ | Have 2+ consumers in your group |
+| 5 | **Watchlist** | 5️⃣ | Produce first watchlist message |
 
-Each valid action earns **10 points**.
+> Step 2 (Transform) has no achievement - your filter is verified when 3️⃣ unlocks.
 
-### Progress Achievements
+### Error Indicators
 
-| Badge | Name | How to Unlock | Points |
-|-------|------|---------------|--------|
-| 🐣 | **First Steps** | Produce your first valid action | 10 |
-| 🔥 | **Fifty** | Produce 50 valid actions | 100 |
-| 💯 | **Century** | Produce 100 valid actions | 200 |
-| ⚡ | **Streak 10** | 10 consecutive correct actions | 50 |
-
-### Mistake Achievements (0 points - educational)
-
-These help you identify what went wrong:
-
-| Badge | Name | What Went Wrong |
-|-------|------|-----------------|
+| Emoji | Error | What Went Wrong |
+|-------|-------|-----------------|
 | ❌ | **Parse Error** | Invalid JSON format |
-| 👻 | **Ghost User** | Customer doesn't exist in `new_users` |
-| 2️⃣ | **Duplicate** | Already flagged this customer |
-| ❓ | **Missing Fields** | Missing required fields |
-| 🙈 | **False Positive** | User doesn't match your filter |
+| ❓ | **Missing Fields** | Missing `customer`, `type`, `reason`, or `team` |
 
-### Infrastructure Achievements
+### Reading the Leaderboard
 
-| Badge | Name | How to Unlock | Points |
-|-------|------|---------------|--------|
-| 🔌 | **Connected** | Consumer group is active | 25 |
-| 👥 | **Scaled** | 2+ consumers in your group | 50 |
+- **Progress column**: Shows 1️⃣ 3️⃣ 4️⃣ 5️⃣ for completed steps (⬜ for incomplete)
+- **Errors column**: Shows error counts (e.g., ❌x2)
+- **Team color**: Green (all 4) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
 
 ---
 

@@ -5,11 +5,29 @@ Now that you’ve parsed your JSON message into a structured format, it’s time
 ## TODOs
 
 1. **Filter Users:** Implement filters based on your team's assigned criteria. Each team has a unique objective to achieve, which can be seen below.
-2. **Retain Key Fields:** Ensure your processing includes the following fields:
-   - `type`: Describes the operation being performed.
-   - `reason`: Explains the context or motivation for the operation.
+2. **Assign Output Labels:** When a user matches your filter, you'll produce an action message in Step 3. This message needs two labels from your team's row in the table below:
+   - `type`: The category of action (e.g., `CONTACT_CUSTOMER`, `SALES_LEAD`)
+   - `reason`: Why this user was flagged (e.g., `LEGACY_EMAIL_PROVIDER`, `VIP_USER`)
 
-These fields are crucial for generating the next Kafka message, so be sure to include them in your output.
+These are **NOT** fields in the incoming user data—they're predetermined values you ADD to your output.
+
+### Understanding the Data Flow
+
+```
+INPUT (from new_users topic)          OUTPUT (to actions topic)
+┌─────────────────────────────┐       ┌────────────────────────────────────┐
+│ {                           │       │ {                                  │
+│   "email": "bob@hotmail.com"│       │   "customer": "bob@hotmail.com",   │
+│   "company": "Acme Inc",    │  ──►  │   "type": "CONTACT_CUSTOMER",      │ ← From your team's row
+│   "premium": true,          │       │   "reason": "LEGACY_EMAIL_PROVIDER"│ ← From your team's row
+│   "credit": 15,             │       │   "team": "team-1"                 │
+│   ...                       │       │ }                                  │
+│ }                           │       └────────────────────────────────────┘
+└─────────────────────────────┘
+     ↑ No type/reason here!              ↑ You ADD type/reason here!
+```
+
+**Key insight:** The `type` and `reason` values come from YOUR TEAM'S ROW in the table below, NOT from the user data.
 
 ## Filter Examples
 
@@ -68,13 +86,9 @@ if any(kw in user["industry"] for kw in keywords):
 
 ---
 
-## Achievements
+## Check Your Work
 
-When you produce actions in the next step, watch the leaderboard for feedback:
-- **False Positive**: You flagged a user who doesn't match your filter criteria
-- **Ghost User**: The customer email doesn't exist in the `new_users` topic
-
-Getting your filter logic right is key to earning points!
+Your filter logic runs locally - you'll verify it works in the next step when you produce messages. If 3️⃣ appears on the leaderboard, your filter is matching users correctly!
 
 ---
 

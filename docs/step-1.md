@@ -56,10 +56,12 @@ With multiple partitions, team members can each consume from different partition
 
 ---
 
-## Achievements
+## Check Your Work
 
-Complete this step to unlock:
-- **Connected** (25 pts): Your consumer group becomes active when you successfully connect and consume messages
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| 1️⃣ in Progress | Success! You're connected |
+| Team stays ⬜ | Connection issue - see Troubleshooting |
 
 ### Step 2: Parsing the JSON
 Once you see the full Kafka message displayed, it's time to interpret its contents. Each message contains a JSON payload, which can be parsed in Python using the `json` package.

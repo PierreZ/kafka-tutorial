@@ -110,6 +110,17 @@ This means on restart, you only need to read a small number of messages to fully
 
 ---
 
+## Check Your Work
+
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| 5️⃣ in Progress | Success! Watchlist message received |
+| 1️⃣ 3️⃣ 4️⃣ 5️⃣ all visible | Tutorial complete! |
+
+Ask the instructor to confirm your watchlist messages are appearing!
+
+---
+
 ## Questions to Consider
 
 1. What happens if two team members run the same code with the same team name?

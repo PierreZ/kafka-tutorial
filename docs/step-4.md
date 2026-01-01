@@ -49,10 +49,12 @@ Ask the instructor to increase the message production rate to simulate higher tr
 
 ---
 
-## Achievements
+## Check Your Work
 
-Complete this step to unlock:
-- **Scaled** (50 pts): Have 2 or more consumers active in your team's consumer group
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| 4️⃣ in Progress | Success! 2+ consumers active |
+| Only 1️⃣ 3️⃣ | Only one consumer running |
 
 ---
 

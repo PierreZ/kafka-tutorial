@@ -23,8 +23,8 @@ Construct a Python dictionary with the following structure:
 | **Key**    | **Value**                |
 |------------|--------------------------|
 | `customer` | The email of the customer |
-| `type`     | The type assigned to your team |
-| `reason`   | The reason assigned to your team |
+| `type`     | The type from your team's row (see Step 2 table) |
+| `reason`   | The reason from your team's row (see Step 2 table) |
 | `team`     | Your team name           |
 
 Once the dictionary is ready, convert it to JSON using [json.dumps](https://docs.python.org/3/library/json.html).
@@ -76,13 +76,15 @@ For more details, refer to the [KafkaProducer guide](https://kafka-python.readth
 
 ---
 
-## Achievements
+## Check Your Work
 
-Complete this step to unlock:
-- **First Steps** (10 pts): Produce your first valid action
-- Watch out for **Parse Error** (invalid JSON) and **Missing Fields** if your message is malformed
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| 3️⃣ in Progress | Success! Your filter + producer are working |
+| ❌ in Errors | Invalid JSON - check `json.dumps()` |
+| ❓ in Errors | Missing fields - need `customer`, `type`, `reason`, `team` |
 
-Ask the instructor to check if they can see your message on the leaderboard!
+Ask the instructor to confirm they can see your message!
 
 ## Next step
 
