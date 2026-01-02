@@ -1,6 +1,5 @@
 use crate::state::team::{ConsumerGroupStatus, GroupState};
 use anyhow::Result;
-use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use std::time::Duration;
 use tracing::{debug, warn};
@@ -22,21 +21,17 @@ pub async fn fetch_consumer_group_statuses(
     password: &str,
 ) -> Vec<ConsumerGroupStatus> {
     // Create a consumer to fetch group list
-    let consumer: BaseConsumer = match ClientConfig::new()
-        .set("bootstrap.servers", brokers)
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", username)
-        .set("sasl.password", password)
-        .set("group.id", "leaderboard-group-monitor")
-        .create()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            warn!("Failed to create consumer for group monitoring: {:?}", e);
-            return fallback_empty_statuses();
-        }
-    };
+    let consumer: BaseConsumer =
+        match kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+            .set("group.id", "leaderboard-group-monitor")
+            .create()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to create consumer for group monitoring: {:?}", e);
+                return fallback_empty_statuses();
+            }
+        };
 
     // Fetch all consumer groups
     match consumer.fetch_group_list(None, Duration::from_secs(5)) {
@@ -109,14 +104,10 @@ pub fn fetch_topic_high_watermark(
     password: &str,
     topic: &str,
 ) -> Result<i64> {
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", brokers)
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", username)
-        .set("sasl.password", password)
-        .set("group.id", "leaderboard-watermark-check")
-        .create()?;
+    let consumer: BaseConsumer =
+        kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+            .set("group.id", "leaderboard-watermark-check")
+            .create()?;
 
     let timeout = Duration::from_secs(5);
 

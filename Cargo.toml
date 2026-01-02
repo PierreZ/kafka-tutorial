@@ -1,5 +1,5 @@
 [workspace]
-members = ["producer", "leaderboard"]
+members = ["common", "producer", "leaderboard"]
 resolver = "2"
 
 [workspace.dependencies]

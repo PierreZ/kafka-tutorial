@@ -1,68 +1,10 @@
 use config::{Config, ConfigError, File};
-use fake::faker::{address, company, creditcard, internet, job, name};
-use fake::Fake;
+use kafka_common::User;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::ClientConfig;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::time::Duration;
 use tokio::time;
 use tracing::{error, info, trace};
-
-#[derive(Serialize, Deserialize, Debug)]
-struct User {
-    email: String,
-    credit_card_number: String,
-    company_name: String,
-    company_slogan: String,
-    industry: String,
-    user_name: String,
-    avatar: String,
-    name: String,
-    profession: String,
-    field: String,
-    premium: bool,
-    credit: i32,
-    time_zone: String,
-    user_agent: String,
-    pack: String,
-}
-
-impl User {
-    pub fn new() -> Self {
-        Self {
-            email: internet::en::FreeEmail().fake(),
-            user_name: internet::en::Username().fake(),
-            user_agent: internet::en::UserAgent().fake(),
-            avatar: if fake::faker::boolean::en::Boolean(90).fake() {
-                format!(
-                    "https://robohash.org/{}.png?size=50x50",
-                    internet::en::Username().fake::<String>()
-                )
-            } else {
-                String::from("example.org")
-            },
-            field: job::en::Field().fake(),
-            company_name: company::en::CompanyName().fake(),
-            company_slogan: company::en::CatchPhrase().fake(),
-            profession: company::en::Profession().fake(),
-            industry: company::en::Industry().fake(),
-            premium: fake::faker::boolean::en::Boolean(50).fake(),
-            credit: (-20..20).fake::<i32>(),
-            time_zone: address::en::TimeZone().fake(),
-            name: if fake::faker::boolean::en::Boolean(90).fake() {
-                name::en::Name().fake::<String>()
-            } else {
-                String::from("John Doe")
-            },
-            credit_card_number: creditcard::en::CreditCardNumber().fake(),
-            pack: if fake::faker::boolean::en::Boolean(10).fake() {
-                String::from("free")
-            } else {
-                String::from("small")
-            },
-        }
-    }
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
@@ -86,16 +28,15 @@ impl Settings {
 }
 
 pub async fn produce(settings: &Settings) {
-    let producer: &FutureProducer = &ClientConfig::new()
-        .set("client.id", "kafka-demo-producer")
-        .set("bootstrap.servers", &settings.brokers)
-        .set("message.timeout.ms", "5000")
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", &settings.username)
-        .set("sasl.password", &settings.password)
-        .create()
-        .expect("Producer creation error");
+    let producer: &FutureProducer = &kafka_common::kafka::new_sasl_ssl_config(
+        &settings.brokers,
+        &settings.username,
+        &settings.password,
+    )
+    .set("client.id", "kafka-demo-producer")
+    .set("message.timeout.ms", "5000")
+    .create()
+    .expect("Producer creation error");
 
     let mut interval = time::interval(Duration::from_millis(settings.interval_millis));
 
@@ -114,7 +55,7 @@ pub async fn produce(settings: &Settings) {
 }
 
 async fn send_message(producer: &FutureProducer, topic_name: &str) {
-    let user = User::new();
+    let user = User::random();
     let value = serde_json::to_string(&user).unwrap();
     match producer
         .send(
@@ -133,10 +74,10 @@ async fn send_message(producer: &FutureProducer, topic_name: &str) {
 }
 #[cfg(test)]
 mod tests {
-    use crate::User;
+    use kafka_common::User;
 
     #[test]
     fn show_user() {
-        dbg!(User::new());
+        dbg!(User::random());
     }
 }

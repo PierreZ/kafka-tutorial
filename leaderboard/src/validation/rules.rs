@@ -1,14 +1,5 @@
+use kafka_common::Action;
 use serde::Deserialize;
-
-/// Simplified action struct - just for parsing and extracting team
-#[derive(Debug, Clone, Deserialize)]
-pub struct Action {
-    pub customer: Option<String>,
-    #[serde(rename = "type")]
-    pub action_type: Option<String>,
-    pub reason: Option<String>,
-    pub team: String,
-}
 
 /// Simple validation result - no cross-consumption validation
 #[derive(Debug, Clone)]

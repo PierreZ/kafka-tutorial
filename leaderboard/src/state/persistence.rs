@@ -4,7 +4,6 @@ use futures::StreamExt;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::Message;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::ClientConfig;
 use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -48,16 +47,12 @@ pub async fn restore_states(
 ) -> Result<HashMap<String, TeamState>> {
     info!("Restoring state from topic: {}", topic);
 
-    let consumer: StreamConsumer = ClientConfig::new()
-        .set("group.id", "leaderboard-state-restore")
-        .set("bootstrap.servers", brokers)
-        .set("enable.auto.commit", "false")
-        .set("auto.offset.reset", "earliest")
-        .set("security.protocol", "SASL_SSL")
-        .set("sasl.mechanisms", "PLAIN")
-        .set("sasl.username", username)
-        .set("sasl.password", password)
-        .create()?;
+    let consumer: StreamConsumer =
+        kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+            .set("group.id", "leaderboard-state-restore")
+            .set("enable.auto.commit", "false")
+            .set("auto.offset.reset", "earliest")
+            .create()?;
 
     // Subscribe to the topic
     consumer.subscribe(&[topic])?;

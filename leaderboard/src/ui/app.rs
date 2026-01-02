@@ -10,6 +10,8 @@ use crate::validation::rules::{
 use super::event_buffer::{BufferedEvent, EventBuffer};
 use super::widgets::{EventViewWidget, HelpWidget, LeaderboardWidget, TeamDetailWidget};
 
+use kafka_common::WatchlistEntry;
+
 use anyhow::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
@@ -27,7 +29,6 @@ use ratatui::{
 };
 use rdkafka::consumer::Consumer;
 use rdkafka::message::Message;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
@@ -140,15 +141,7 @@ impl UiState {
     }
 }
 
-/// Watchlist entry from students
-#[derive(Debug, Clone, Deserialize)]
-pub struct WatchlistEntry {
-    pub team: String,
-    #[allow(dead_code)]
-    pub company: String,
-    #[allow(dead_code)]
-    pub flag_count: u32,
-}
+// WatchlistEntry is imported from kafka_common
 
 /// Application state shared between tasks
 #[allow(dead_code)]
@@ -337,6 +330,141 @@ fn create_demo_state() -> AppState {
             lag: 0,
         },
     ];
+
+    // Add demo events for the event tabs
+    use crate::ui::event_buffer::BufferedEvent;
+    use kafka_common::{Action, User, WatchlistEntry};
+
+    // Demo new_users events
+    let demo_users = vec![
+        User {
+            email: "alice@techcorp.io".to_string(),
+            credit_card_number: "4532-****-****-1234".to_string(),
+            company_name: "TechCorp".to_string(),
+            company_slogan: "Innovation First".to_string(),
+            industry: "Technology".to_string(),
+            user_name: "alice_tech".to_string(),
+            avatar: "https://example.com/avatar1.png".to_string(),
+            name: "Alice Johnson".to_string(),
+            profession: "Software Engineer".to_string(),
+            field: "Backend Development".to_string(),
+            premium: true,
+            credit: 1500,
+            time_zone: "Europe/Paris".to_string(),
+            user_agent: "Mozilla/5.0".to_string(),
+            pack: "gold".to_string(),
+        },
+        User {
+            email: "bob@startup.co".to_string(),
+            credit_card_number: "5412-****-****-5678".to_string(),
+            company_name: "StartupCo".to_string(),
+            company_slogan: "Move Fast".to_string(),
+            industry: "Finance".to_string(),
+            user_name: "bob_startup".to_string(),
+            avatar: "https://example.com/avatar2.png".to_string(),
+            name: "Bob Smith".to_string(),
+            profession: "Data Analyst".to_string(),
+            field: "Analytics".to_string(),
+            premium: false,
+            credit: 250,
+            time_zone: "America/New_York".to_string(),
+            user_agent: "Chrome/120.0".to_string(),
+            pack: "basic".to_string(),
+        },
+        User {
+            email: "charlie@megacorp.com".to_string(),
+            credit_card_number: "3782-****-****-9012".to_string(),
+            company_name: "MegaCorp".to_string(),
+            company_slogan: "Scale Everything".to_string(),
+            industry: "Healthcare".to_string(),
+            user_name: "charlie_mega".to_string(),
+            avatar: "https://example.com/avatar3.png".to_string(),
+            name: "Charlie Brown".to_string(),
+            profession: "Product Manager".to_string(),
+            field: "Product".to_string(),
+            premium: true,
+            credit: 3000,
+            time_zone: "Asia/Tokyo".to_string(),
+            user_agent: "Safari/17.0".to_string(),
+            pack: "enterprise".to_string(),
+        },
+    ];
+
+    for user in demo_users {
+        let json = serde_json::to_string(&user).unwrap_or_default();
+        app_state
+            .new_users_events
+            .push(BufferedEvent::new(json, None));
+    }
+
+    // Demo actions events
+    let demo_actions = vec![
+        Action {
+            customer: Some("alice@techcorp.io".to_string()),
+            action_type: Some("CONTACT".to_string()),
+            reason: Some("VIP customer".to_string()),
+            team: "team-1".to_string(),
+        },
+        Action {
+            customer: Some("bob@startup.co".to_string()),
+            action_type: Some("FLAG".to_string()),
+            reason: Some("Suspicious activity".to_string()),
+            team: "team-2".to_string(),
+        },
+        Action {
+            customer: Some("charlie@megacorp.com".to_string()),
+            action_type: Some("CONTACT".to_string()),
+            reason: Some("High value".to_string()),
+            team: "team-1".to_string(),
+        },
+        Action {
+            customer: Some("dave@example.org".to_string()),
+            action_type: Some("FLAG".to_string()),
+            reason: Some("Premium expiring".to_string()),
+            team: "team-3".to_string(),
+        },
+        Action {
+            customer: Some("eve@company.net".to_string()),
+            action_type: Some("CONTACT".to_string()),
+            reason: Some("New signup".to_string()),
+            team: "team-5".to_string(),
+        },
+    ];
+
+    for action in demo_actions {
+        let team = action.team.clone();
+        let json = serde_json::to_string(&action).unwrap_or_default();
+        app_state
+            .actions_events
+            .push(BufferedEvent::new(json, Some(team)));
+    }
+
+    // Demo watchlist events
+    let demo_watchlist = vec![
+        WatchlistEntry {
+            team: "team-1".to_string(),
+            company: "TechCorp".to_string(),
+            flag_count: 3,
+        },
+        WatchlistEntry {
+            team: "team-2".to_string(),
+            company: "StartupCo".to_string(),
+            flag_count: 7,
+        },
+        WatchlistEntry {
+            team: "team-5".to_string(),
+            company: "MegaCorp".to_string(),
+            flag_count: 2,
+        },
+    ];
+
+    for entry in demo_watchlist {
+        let team = entry.team.clone();
+        let json = serde_json::to_string(&entry).unwrap_or_default();
+        app_state
+            .watchlist_events
+            .push(BufferedEvent::new(json, Some(team)));
+    }
 
     app_state
 }
