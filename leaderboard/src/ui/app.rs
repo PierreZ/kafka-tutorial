@@ -7,7 +7,8 @@ use crate::validation::rules::{
     extract_team_from_payload, validate_action_simple, SimpleValidationResult,
 };
 
-use super::widgets::{HelpWidget, LeaderboardWidget, TeamDetailWidget};
+use super::event_buffer::{BufferedEvent, EventBuffer};
+use super::widgets::{EventViewWidget, HelpWidget, LeaderboardWidget, TeamDetailWidget};
 
 use anyhow::Result;
 use crossterm::{
@@ -19,7 +20,9 @@ use futures::StreamExt;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    widgets::TableState,
+    style::{Color, Modifier, Style},
+    text::Line,
+    widgets::{Block, Borders, TableState, Tabs},
     Frame, Terminal,
 };
 use rdkafka::consumer::Consumer;
@@ -40,6 +43,36 @@ pub enum ViewMode {
     Help,
 }
 
+/// Current tab selection
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TopicTab {
+    #[default]
+    Leaderboard,
+    NewUsers,
+    Actions,
+    Watchlist,
+}
+
+impl TopicTab {
+    pub fn title(&self) -> &'static str {
+        match self {
+            TopicTab::Leaderboard => "1: Leaderboard",
+            TopicTab::NewUsers => "2: new_users",
+            TopicTab::Actions => "3: actions",
+            TopicTab::Watchlist => "4: watchlist",
+        }
+    }
+
+    pub fn all() -> [TopicTab; 4] {
+        [
+            TopicTab::Leaderboard,
+            TopicTab::NewUsers,
+            TopicTab::Actions,
+            TopicTab::Watchlist,
+        ]
+    }
+}
+
 /// UI-specific state for navigation and display modes
 pub struct UiState {
     /// Currently selected row index
@@ -50,6 +83,10 @@ pub struct UiState {
     pub last_data_update: Option<Instant>,
     /// Table state for StatefulWidget rendering
     pub table_state: TableState,
+    /// Currently selected tab
+    pub current_tab: TopicTab,
+    /// Scroll offset for event views (lines from bottom)
+    pub event_scroll: usize,
 }
 
 impl UiState {
@@ -59,6 +96,8 @@ impl UiState {
             view_mode: ViewMode::Leaderboard,
             last_data_update: None,
             table_state: TableState::default(),
+            current_tab: TopicTab::default(),
+            event_scroll: 0,
         }
     }
 
@@ -120,6 +159,10 @@ pub struct AppState {
     pub first_blood_awarded: bool, // Track if FirstBlood has been given
     pub champion_awarded: bool,    // Track if Champion has been given
     pub topic_high_watermark: i64, // Track new_users topic high watermark for lag calculation
+    /// Event buffers for each topic (150 events each)
+    pub new_users_events: EventBuffer,
+    pub actions_events: EventBuffer,
+    pub watchlist_events: EventBuffer,
 }
 
 impl AppState {
@@ -138,6 +181,9 @@ impl AppState {
             first_blood_awarded: false,
             champion_awarded: false,
             topic_high_watermark: 0,
+            new_users_events: EventBuffer::new(150),
+            actions_events: EventBuffer::new(150),
+            watchlist_events: EventBuffer::new(150),
         }
     }
 
@@ -189,7 +235,9 @@ pub async fn run_demo() -> Result<()> {
 }
 
 fn create_demo_state() -> AppState {
-    use crate::config::{AchievementSettings, KafkaSettings, ScoringSettings, Settings, TopicSettings};
+    use crate::config::{
+        AchievementSettings, KafkaSettings, ScoringSettings, Settings, TopicSettings,
+    };
 
     let settings = Settings {
         kafka: KafkaSettings {
@@ -361,6 +409,15 @@ pub async fn run(settings: Settings) -> Result<()> {
         }
     });
 
+    // Spawn new_users consumer task (for event display only)
+    let state_clone = Arc::clone(&state);
+    let settings_clone = settings.clone();
+    let new_users_task = tokio::spawn(async move {
+        if let Err(e) = consume_new_users(state_clone, settings_clone).await {
+            error!("new_users consumer error: {:?}", e);
+        }
+    });
+
     // Spawn consumer group monitoring task
     let state_clone = Arc::clone(&state);
     let producer_clone = producer.clone();
@@ -436,7 +493,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                             }
 
                             // PartitionExplorer: configurable consumers (default 3, teaches partition limits)
-                            if status.members >= settings_clone.achievements.partition_explorer_members
+                            if status.members
+                                >= settings_clone.achievements.partition_explorer_members
                                 && team.unlock_achievement(AchievementType::PartitionExplorer)
                             {
                                 info!(
@@ -457,8 +515,9 @@ pub async fn run(settings: Settings) -> Result<()> {
                             team.update_lag(estimated_lag);
 
                             // LagBuster: Had configurable lag (default 100) and now caught up
-                            if team.qualifies_for_lag_buster(settings_clone.achievements.lag_buster_threshold)
-                                && team.unlock_achievement(AchievementType::LagBuster)
+                            if team.qualifies_for_lag_buster(
+                                settings_clone.achievements.lag_buster_threshold,
+                            ) && team.unlock_achievement(AchievementType::LagBuster)
                             {
                                 info!("{} unlocked LagBuster achievement!", status.team_name);
                                 let team_clone = team.clone();
@@ -503,12 +562,13 @@ pub async fn run(settings: Settings) -> Result<()> {
     info!("Shutting down background tasks...");
     actions_task.abort();
     watchlist_task.abort();
+    new_users_task.abort();
     admin_task.abort();
 
     // Wait briefly for tasks to complete their abort handling
     let shutdown_timeout = Duration::from_millis(100);
     let _ = tokio::time::timeout(shutdown_timeout, async {
-        let _ = tokio::join!(actions_task, watchlist_task, admin_task);
+        let _ = tokio::join!(actions_task, watchlist_task, new_users_task, admin_task);
     })
     .await;
     debug!("Background tasks shut down");
@@ -545,14 +605,72 @@ async fn run_ui(
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     let mut ui_guard = ui_state.write().await;
-                    let team_count = {
+                    let (team_count, event_buffer_len) = {
                         let state_guard = state.read().await;
-                        state_guard.teams.len()
+                        let buffer_len = match ui_guard.current_tab {
+                            TopicTab::NewUsers => state_guard.new_users_events.len(),
+                            TopicTab::Actions => state_guard.actions_events.len(),
+                            TopicTab::Watchlist => state_guard.watchlist_events.len(),
+                            TopicTab::Leaderboard => 0,
+                        };
+                        (state_guard.teams.len(), buffer_len)
                     };
 
+                    // Handle overlays first (Help, TeamDetail)
                     match ui_guard.view_mode {
-                        ViewMode::Leaderboard => match key.code {
-                            KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                        ViewMode::TeamDetail => {
+                            match key.code {
+                                KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => {
+                                    ui_guard.view_mode = ViewMode::Leaderboard;
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+                        ViewMode::Help => {
+                            match key.code {
+                                KeyCode::Esc
+                                | KeyCode::Char('h')
+                                | KeyCode::Char('?')
+                                | KeyCode::Char('q') => {
+                                    ui_guard.view_mode = ViewMode::Leaderboard;
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+                        ViewMode::Leaderboard => {}
+                    }
+
+                    // Global quit
+                    if matches!(key.code, KeyCode::Char('q') | KeyCode::Esc) {
+                        return Ok(());
+                    }
+
+                    // Tab switching (1-4)
+                    match key.code {
+                        KeyCode::Char('1') => {
+                            ui_guard.current_tab = TopicTab::Leaderboard;
+                            ui_guard.event_scroll = 0;
+                        }
+                        KeyCode::Char('2') => {
+                            ui_guard.current_tab = TopicTab::NewUsers;
+                            ui_guard.event_scroll = 0;
+                        }
+                        KeyCode::Char('3') => {
+                            ui_guard.current_tab = TopicTab::Actions;
+                            ui_guard.event_scroll = 0;
+                        }
+                        KeyCode::Char('4') => {
+                            ui_guard.current_tab = TopicTab::Watchlist;
+                            ui_guard.event_scroll = 0;
+                        }
+                        _ => {}
+                    }
+
+                    // Tab-specific navigation
+                    match ui_guard.current_tab {
+                        TopicTab::Leaderboard => match key.code {
                             KeyCode::Up | KeyCode::Char('k') => {
                                 ui_guard.move_selection_up(team_count);
                             }
@@ -575,21 +693,33 @@ async fn run_ui(
                             }
                             _ => {}
                         },
-                        ViewMode::TeamDetail => match key.code {
-                            KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => {
-                                ui_guard.view_mode = ViewMode::Leaderboard;
+                        TopicTab::NewUsers | TopicTab::Actions | TopicTab::Watchlist => {
+                            match key.code {
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    // Scroll up = show older events
+                                    ui_guard.event_scroll = ui_guard
+                                        .event_scroll
+                                        .saturating_add(1)
+                                        .min(event_buffer_len.saturating_sub(1));
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    // Scroll down = show newer events
+                                    ui_guard.event_scroll = ui_guard.event_scroll.saturating_sub(1);
+                                }
+                                KeyCode::Home => {
+                                    // Jump to newest (scroll = 0)
+                                    ui_guard.event_scroll = 0;
+                                }
+                                KeyCode::End => {
+                                    // Jump to oldest
+                                    ui_guard.event_scroll = event_buffer_len.saturating_sub(1);
+                                }
+                                KeyCode::Char('h') | KeyCode::Char('?') => {
+                                    ui_guard.view_mode = ViewMode::Help;
+                                }
+                                _ => {}
                             }
-                            _ => {}
-                        },
-                        ViewMode::Help => match key.code {
-                            KeyCode::Esc
-                            | KeyCode::Char('h')
-                            | KeyCode::Char('?')
-                            | KeyCode::Char('q') => {
-                                ui_guard.view_mode = ViewMode::Leaderboard;
-                            }
-                            _ => {}
-                        },
+                        }
                     }
                 }
             }
@@ -600,39 +730,90 @@ async fn run_ui(
 fn draw_ui(f: &mut Frame, state: &AppState, ui_state: &mut UiState) {
     let size = f.area();
 
-    // Simple layout: full-width table
+    // Layout: tabs at top, content below
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0)])
+        .constraints([Constraint::Length(3), Constraint::Min(0)])
         .split(size);
 
-    // Build consumer groups map
-    let consumer_map = LeaderboardWidget::build_consumer_map(&state.consumer_groups);
+    // Render tab bar
+    render_tabs(f, chunks[0], ui_state.current_tab);
 
-    // Render leaderboard table with selection
-    let sorted_teams = state.get_sorted_teams();
-    let leaderboard =
-        LeaderboardWidget::new(&sorted_teams, &consumer_map, ui_state.last_data_update);
-    leaderboard.render_stateful(f, chunks[0], &mut ui_state.table_state);
+    // Render content based on current tab
+    match ui_state.current_tab {
+        TopicTab::Leaderboard => {
+            // Build consumer groups map
+            let consumer_map = LeaderboardWidget::build_consumer_map(&state.consumer_groups);
 
-    // Render overlays based on view mode
-    match ui_state.view_mode {
-        ViewMode::Help => {
-            HelpWidget::render(f, size);
-        }
-        ViewMode::TeamDetail => {
-            if let Some(selected) = ui_state.selected_row {
-                if let Some(team) = sorted_teams.get(selected) {
-                    let consumer_status = state
-                        .consumer_groups
-                        .iter()
-                        .find(|s| s.team_name == team.team_name);
-                    TeamDetailWidget::new(team, consumer_status).render(f, size);
+            // Render leaderboard table with selection
+            let sorted_teams = state.get_sorted_teams();
+            let leaderboard =
+                LeaderboardWidget::new(&sorted_teams, &consumer_map, ui_state.last_data_update);
+            leaderboard.render_stateful(f, chunks[1], &mut ui_state.table_state);
+
+            // Render overlays based on view mode
+            match ui_state.view_mode {
+                ViewMode::Help => {
+                    HelpWidget::render(f, size);
                 }
+                ViewMode::TeamDetail => {
+                    if let Some(selected) = ui_state.selected_row {
+                        if let Some(team) = sorted_teams.get(selected) {
+                            let consumer_status = state
+                                .consumer_groups
+                                .iter()
+                                .find(|s| s.team_name == team.team_name);
+                            TeamDetailWidget::new(team, consumer_status).render(f, size);
+                        }
+                    }
+                }
+                ViewMode::Leaderboard => {}
             }
         }
-        ViewMode::Leaderboard => {}
+        TopicTab::NewUsers => {
+            EventViewWidget::new(&state.new_users_events, "new_users", ui_state.event_scroll)
+                .render(f, chunks[1]);
+        }
+        TopicTab::Actions => {
+            EventViewWidget::new(&state.actions_events, "actions", ui_state.event_scroll)
+                .render(f, chunks[1]);
+        }
+        TopicTab::Watchlist => {
+            EventViewWidget::new(&state.watchlist_events, "watchlist", ui_state.event_scroll)
+                .render(f, chunks[1]);
+        }
     }
+}
+
+fn render_tabs(f: &mut Frame, area: ratatui::layout::Rect, current: TopicTab) {
+    let titles: Vec<Line> = TopicTab::all()
+        .iter()
+        .map(|t| Line::from(t.title()))
+        .collect();
+
+    let selected = match current {
+        TopicTab::Leaderboard => 0,
+        TopicTab::NewUsers => 1,
+        TopicTab::Actions => 2,
+        TopicTab::Watchlist => 3,
+    };
+
+    let tabs = Tabs::new(titles)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Kafka Events "),
+        )
+        .select(selected)
+        .style(Style::default().fg(Color::White))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .divider("|");
+
+    f.render_widget(tabs, area);
 }
 
 async fn consume_actions(
@@ -660,6 +841,20 @@ async fn consume_actions(
 
                     let mut state_guard = state.write().await;
 
+                    // Buffer event for display
+                    let json_str = String::from_utf8_lossy(payload).to_string();
+                    let compact = serde_json::from_str::<serde_json::Value>(&json_str)
+                        .map(|v| serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone()))
+                        .unwrap_or_else(|_| json_str);
+                    let team_for_event = match &validation {
+                        SimpleValidationResult::Valid { team } => Some(team.clone()),
+                        SimpleValidationResult::MissingFields { team } => Some(team.clone()),
+                        SimpleValidationResult::InvalidJson => extract_team_from_payload(payload),
+                    };
+                    state_guard
+                        .actions_events
+                        .push(BufferedEvent::new(compact, team_for_event));
+
                     // Track messages_consumed for lag calculation (all messages, not just valid)
                     if let Some(team) = match &validation {
                         SimpleValidationResult::Valid { team } => Some(team.clone()),
@@ -683,7 +878,8 @@ async fn consume_actions(
                                 }
 
                                 // HighThroughput: configurable valid actions (default 100)
-                                if team_state.action_count >= settings.achievements.high_throughput_threshold
+                                if team_state.action_count
+                                    >= settings.achievements.high_throughput_threshold
                                     && team_state
                                         .unlock_achievement(AchievementType::HighThroughput)
                                 {
@@ -691,7 +887,8 @@ async fn consume_actions(
                                 }
 
                                 // CleanStreak: configurable consecutive valid messages (default 50)
-                                if team_state.clean_streak_count >= settings.achievements.clean_streak_threshold
+                                if team_state.clean_streak_count
+                                    >= settings.achievements.clean_streak_threshold
                                     && team_state.unlock_achievement(AchievementType::CleanStreak)
                                 {
                                     info!("{} unlocked CleanStreak achievement!", team);
@@ -759,6 +956,17 @@ async fn consume_watchlist(
                         Ok(entry) => {
                             let mut state_guard = state.write().await;
 
+                            // Buffer event for display
+                            let json_str = String::from_utf8_lossy(payload).to_string();
+                            let compact = serde_json::from_str::<serde_json::Value>(&json_str)
+                                .map(|v| {
+                                    serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone())
+                                })
+                                .unwrap_or_else(|_| json_str);
+                            state_guard
+                                .watchlist_events
+                                .push(BufferedEvent::new(compact, Some(entry.team.clone())));
+
                             if let Some(team_state) = state_guard.teams.get_mut(&entry.team) {
                                 team_state.watchlist_count += 1;
                                 // Unlock WatchlistDone on first watchlist message
@@ -784,6 +992,45 @@ async fn consume_watchlist(
             }
             Err(e) => {
                 warn!("Error consuming watchlist: {:?}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn consume_new_users(state: Arc<RwLock<AppState>>, settings: Settings) -> Result<()> {
+    let consumer = create_consumer(
+        &settings.kafka.brokers,
+        &settings.kafka.username,
+        &settings.kafka.password,
+        &format!("{}-new-users", settings.kafka.consumer_group),
+    )?;
+
+    consumer.subscribe(&[&settings.topics.new_users])?;
+    info!("Subscribed to topic: {}", settings.topics.new_users);
+
+    let mut stream = consumer.stream();
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(message) => {
+                if let Some(payload) = message.payload() {
+                    // Convert to compact JSON string
+                    let json_str = String::from_utf8_lossy(payload).to_string();
+                    let compact = serde_json::from_str::<serde_json::Value>(&json_str)
+                        .map(|v| serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone()))
+                        .unwrap_or_else(|_| json_str);
+
+                    // No team for new_users (source data from producer)
+                    let event = BufferedEvent::new(compact, None);
+
+                    let mut state_guard = state.write().await;
+                    state_guard.new_users_events.push(event);
+                }
+            }
+            Err(e) => {
+                warn!("Error consuming new_users: {:?}", e);
             }
         }
     }

@@ -102,11 +102,7 @@ impl<'a> TeamDetailWidget<'a> {
 
         for bonus in AchievementType::all_bonus() {
             let (emoji, status, style) = if self.team.has_achievement(bonus) {
-                (
-                    bonus.emoji(),
-                    "EARNED",
-                    Style::default().fg(Color::Magenta),
-                )
+                (bonus.emoji(), "EARNED", Style::default().fg(Color::Magenta))
             } else {
                 ("  ", "locked", Style::default().fg(Color::DarkGray))
             };
@@ -129,10 +125,7 @@ impl<'a> TeamDetailWidget<'a> {
     }
 
     fn render_stats(&self, frame: &mut Frame, area: Rect) {
-        let consumers = self
-            .consumer_status
-            .map(|s| s.members)
-            .unwrap_or(0);
+        let consumers = self.consumer_status.map(|s| s.members).unwrap_or(0);
         let lag = self.consumer_status.map(|s| s.lag).unwrap_or(0);
 
         let stats = vec![

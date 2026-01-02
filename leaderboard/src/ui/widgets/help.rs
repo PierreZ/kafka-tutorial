@@ -60,9 +60,7 @@ impl HelpWidget {
         // Section: Error Indicators
         lines.push(Line::from(Span::styled(
             "=== ERROR INDICATORS ===",
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(""));
 
@@ -99,6 +97,20 @@ impl HelpWidget {
         }
         lines.push(Line::from(""));
 
+        // Section: Tab Navigation
+        lines.push(Line::from(Span::styled(
+            "=== TAB NAVIGATION ===",
+            Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(""));
+        lines.push(Line::from("  1           Leaderboard view"));
+        lines.push(Line::from("  2           new_users events"));
+        lines.push(Line::from("  3           actions events"));
+        lines.push(Line::from("  4           watchlist events"));
+        lines.push(Line::from(""));
+
         // Section: Keyboard Shortcuts
         lines.push(Line::from(Span::styled(
             "=== KEYBOARD SHORTCUTS ===",
@@ -107,11 +119,13 @@ impl HelpWidget {
                 .add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(""));
-        lines.push(Line::from("  ↑/k         Move selection up"));
-        lines.push(Line::from("  ↓/j         Move selection down"));
-        lines.push(Line::from("  Enter       View team details"));
-        lines.push(Line::from("  Home        Jump to first team"));
-        lines.push(Line::from("  End         Jump to last team"));
+        lines.push(Line::from("  ↑/k         Move selection up / Scroll older"));
+        lines.push(Line::from(
+            "  ↓/j         Move selection down / Scroll newer",
+        ));
+        lines.push(Line::from("  Enter       View team details (leaderboard)"));
+        lines.push(Line::from("  Home        Jump to first / newest events"));
+        lines.push(Line::from("  End         Jump to last / oldest events"));
         lines.push(Line::from("  h / ?       Show this help screen"));
         lines.push(Line::from("  q / Esc     Quit (or close popup)"));
         lines.push(Line::from(""));
@@ -124,7 +138,9 @@ impl HelpWidget {
                 .add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(""));
-        lines.push(Line::from("  Team        - Team name (team-1 through team-15)"));
+        lines.push(Line::from(
+            "  Team        - Team name (team-1 through team-15)",
+        ));
         lines.push(Line::from("  Achievements- Step and bonus badges earned"));
         lines.push(Line::from("  Errors      - Error indicators with counts"));
         lines.push(Line::from("  👥          - Consumer group member count"));

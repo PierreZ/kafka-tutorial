@@ -1,4 +1,5 @@
 pub mod app;
+pub mod event_buffer;
 mod widgets;
 
 use crate::config::Settings;
