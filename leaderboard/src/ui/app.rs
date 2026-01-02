@@ -8,7 +8,9 @@ use crate::validation::rules::{
 };
 
 use super::event_buffer::{BufferedEvent, EventBuffer};
-use super::widgets::{EventViewWidget, HelpWidget, LeaderboardWidget, TeamDetailWidget};
+use super::widgets::{
+    EventViewWidget, HelpWidget, LeaderboardWidget, MetricsWidget, TeamDetailWidget,
+};
 
 use kafka_common::WatchlistEntry;
 
@@ -49,6 +51,7 @@ pub enum ViewMode {
 pub enum TopicTab {
     #[default]
     Leaderboard,
+    Metrics,
     NewUsers,
     Actions,
     Watchlist,
@@ -58,15 +61,17 @@ impl TopicTab {
     pub fn title(&self) -> &'static str {
         match self {
             TopicTab::Leaderboard => "1: Leaderboard",
-            TopicTab::NewUsers => "2: new_users",
-            TopicTab::Actions => "3: actions",
-            TopicTab::Watchlist => "4: watchlist",
+            TopicTab::Metrics => "2: Metrics",
+            TopicTab::NewUsers => "3: new_users",
+            TopicTab::Actions => "4: actions",
+            TopicTab::Watchlist => "5: watchlist",
         }
     }
 
-    pub fn all() -> [TopicTab; 4] {
+    pub fn all() -> [TopicTab; 5] {
         [
             TopicTab::Leaderboard,
+            TopicTab::Metrics,
             TopicTab::NewUsers,
             TopicTab::Actions,
             TopicTab::Watchlist,
@@ -739,7 +744,7 @@ async fn run_ui(
                             TopicTab::NewUsers => state_guard.new_users_events.len(),
                             TopicTab::Actions => state_guard.actions_events.len(),
                             TopicTab::Watchlist => state_guard.watchlist_events.len(),
-                            TopicTab::Leaderboard => 0,
+                            TopicTab::Leaderboard | TopicTab::Metrics => 0,
                         };
                         (state_guard.teams.len(), buffer_len)
                     };
@@ -775,21 +780,25 @@ async fn run_ui(
                         return Ok(());
                     }
 
-                    // Tab switching (1-4)
+                    // Tab switching (1-5)
                     match key.code {
                         KeyCode::Char('1') => {
                             ui_guard.current_tab = TopicTab::Leaderboard;
                             ui_guard.event_scroll = 0;
                         }
                         KeyCode::Char('2') => {
-                            ui_guard.current_tab = TopicTab::NewUsers;
+                            ui_guard.current_tab = TopicTab::Metrics;
                             ui_guard.event_scroll = 0;
                         }
                         KeyCode::Char('3') => {
-                            ui_guard.current_tab = TopicTab::Actions;
+                            ui_guard.current_tab = TopicTab::NewUsers;
                             ui_guard.event_scroll = 0;
                         }
                         KeyCode::Char('4') => {
+                            ui_guard.current_tab = TopicTab::Actions;
+                            ui_guard.event_scroll = 0;
+                        }
+                        KeyCode::Char('5') => {
                             ui_guard.current_tab = TopicTab::Watchlist;
                             ui_guard.event_scroll = 0;
                         }
@@ -798,7 +807,7 @@ async fn run_ui(
 
                     // Tab-specific navigation
                     match ui_guard.current_tab {
-                        TopicTab::Leaderboard => match key.code {
+                        TopicTab::Leaderboard | TopicTab::Metrics => match key.code {
                             KeyCode::Up | KeyCode::Char('k') => {
                                 ui_guard.move_selection_up(team_count);
                             }
@@ -818,6 +827,18 @@ async fn run_ui(
                             }
                             KeyCode::End => {
                                 ui_guard.select_last(team_count);
+                            }
+                            KeyCode::PageUp => {
+                                // Jump 5 rows up
+                                for _ in 0..5 {
+                                    ui_guard.move_selection_up(team_count);
+                                }
+                            }
+                            KeyCode::PageDown => {
+                                // Jump 5 rows down
+                                for _ in 0..5 {
+                                    ui_guard.move_selection_down(team_count);
+                                }
                             }
                             _ => {}
                         },
@@ -875,9 +896,50 @@ fn draw_ui(f: &mut Frame, state: &AppState, ui_state: &mut UiState) {
 
             // Render leaderboard table with selection
             let sorted_teams = state.get_sorted_teams();
-            let leaderboard =
-                LeaderboardWidget::new(&sorted_teams, &consumer_map, ui_state.last_data_update);
+            let total_teams = sorted_teams.len();
+            let leaderboard = LeaderboardWidget::new(
+                &sorted_teams,
+                &consumer_map,
+                ui_state.last_data_update,
+                ui_state.selected_row,
+                total_teams,
+            );
             leaderboard.render_stateful(f, chunks[1], &mut ui_state.table_state);
+
+            // Render overlays based on view mode
+            match ui_state.view_mode {
+                ViewMode::Help => {
+                    HelpWidget::render(f, size);
+                }
+                ViewMode::TeamDetail => {
+                    if let Some(selected) = ui_state.selected_row {
+                        if let Some(team) = sorted_teams.get(selected) {
+                            let consumer_status = state
+                                .consumer_groups
+                                .iter()
+                                .find(|s| s.team_name == team.team_name);
+                            TeamDetailWidget::new(team, consumer_status).render(f, size);
+                        }
+                    }
+                }
+                ViewMode::Leaderboard => {}
+            }
+        }
+        TopicTab::Metrics => {
+            // Build consumer groups map with full status
+            let consumer_map = MetricsWidget::build_consumer_map(&state.consumer_groups);
+
+            // Get sorted teams (mutable for rate calculations)
+            let mut sorted_teams = state.get_sorted_teams();
+            let total_teams = sorted_teams.len();
+            let mut metrics = MetricsWidget::new(
+                &mut sorted_teams,
+                &consumer_map,
+                ui_state.last_data_update,
+                ui_state.selected_row,
+                total_teams,
+            );
+            metrics.render_stateful(f, chunks[1], &mut ui_state.table_state);
 
             // Render overlays based on view mode
             match ui_state.view_mode {
@@ -921,9 +983,10 @@ fn render_tabs(f: &mut Frame, area: ratatui::layout::Rect, current: TopicTab) {
 
     let selected = match current {
         TopicTab::Leaderboard => 0,
-        TopicTab::NewUsers => 1,
-        TopicTab::Actions => 2,
-        TopicTab::Watchlist => 3,
+        TopicTab::Metrics => 1,
+        TopicTab::NewUsers => 2,
+        TopicTab::Actions => 3,
+        TopicTab::Watchlist => 4,
     };
 
     let tabs = Tabs::new(titles)

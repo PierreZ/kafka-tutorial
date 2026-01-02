@@ -13,6 +13,8 @@ pub struct LeaderboardWidget<'a> {
     teams: &'a [TeamState],
     consumer_groups: &'a HashMap<String, u32>, // team_name -> member count
     last_update: Option<Instant>,
+    selected_index: Option<usize>,
+    total_teams: usize,
 }
 
 impl<'a> LeaderboardWidget<'a> {
@@ -20,11 +22,15 @@ impl<'a> LeaderboardWidget<'a> {
         teams: &'a [TeamState],
         consumer_groups: &'a HashMap<String, u32>,
         last_update: Option<Instant>,
+        selected_index: Option<usize>,
+        total_teams: usize,
     ) -> Self {
         Self {
             teams,
             consumer_groups,
             last_update,
+            selected_index,
+            total_teams,
         }
     }
 
@@ -120,18 +126,27 @@ impl<'a> LeaderboardWidget<'a> {
             None => "Connecting...".to_string(),
         };
 
+        let position = match self.selected_index {
+            Some(idx) => format!("{}/{}", idx + 1, self.total_teams),
+            None => format!("-/{}", self.total_teams),
+        };
+
         format!(
-            " KAFKA TUTORIAL - Steps: 1\u{FE0F}\u{20E3}3\u{FE0F}\u{20E3}4\u{FE0F}\u{20E3}5\u{FE0F}\u{20E3} | Bonus: 🔬📈✨⚔️🚀🏆 | {} ",
-            freshness
+            " KAFKA TUTORIAL - Steps: 🔗📤⚡👁 | Bonus: 🔬📈✨⚔🚀🏆 | {} | {} ",
+            position, freshness
         )
     }
 
     fn format_all_achievements(&self, team: &TeamState) -> String {
         let mut achievements = String::new();
 
-        // Step achievements (always show step number)
+        // Step achievements: show emoji if achieved, dot if not
         for step in AchievementType::all_steps() {
-            achievements.push_str(step.emoji());
+            if team.has_achievement(step) {
+                achievements.push_str(step.emoji());
+            } else {
+                achievements.push('·');
+            }
         }
 
         // Add separator if team has any bonus achievements

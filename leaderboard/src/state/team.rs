@@ -1,7 +1,8 @@
 use super::achievements::AchievementType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::time::{Duration, Instant};
 
 /// State for a single team - simplified for step-based tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +24,13 @@ pub struct TeamState {
     pub achievement_timestamps: HashMap<AchievementType, DateTime<Utc>>, // When each achievement was unlocked
     #[serde(default)]
     pub session_start: Option<DateTime<Utc>>, // When this team's session started
+    // Ephemeral fields for real-time metrics (not persisted)
+    #[serde(skip)]
+    pub last_action_time: Option<Instant>, // When last action was produced
+    #[serde(skip)]
+    pub recent_consumed: VecDeque<Instant>, // Rolling window for consumption rate
+    #[serde(skip)]
+    pub recent_actions: VecDeque<Instant>, // Rolling window for production rate
 }
 
 impl TeamState {
@@ -39,6 +47,9 @@ impl TeamState {
             clean_streak_count: 0,
             achievement_timestamps: HashMap::new(),
             session_start: None,
+            last_action_time: None,
+            recent_consumed: VecDeque::new(),
+            recent_actions: VecDeque::new(),
         }
     }
 
@@ -106,6 +117,70 @@ impl TeamState {
         AchievementType::champion_requirements()
             .iter()
             .all(|a| self.achievements.contains(a))
+    }
+
+    /// Record a consumption event from new_users topic (for rate tracking)
+    pub fn record_consumption(&mut self) {
+        self.recent_consumed.push_back(Instant::now());
+    }
+
+    /// Record an action production event (for rate tracking)
+    pub fn record_action(&mut self) {
+        let now = Instant::now();
+        self.last_action_time = Some(now);
+        self.recent_actions.push_back(now);
+    }
+
+    /// Get consumption rate (messages per minute from new_users)
+    pub fn consumption_rate(&mut self) -> u64 {
+        let cutoff = Instant::now() - Duration::from_secs(60);
+        self.recent_consumed.retain(|&t| t >= cutoff);
+        self.recent_consumed.len() as u64
+    }
+
+    /// Get production rate (messages per minute to actions)
+    pub fn production_rate(&mut self) -> u64 {
+        let cutoff = Instant::now() - Duration::from_secs(60);
+        self.recent_actions.retain(|&t| t >= cutoff);
+        self.recent_actions.len() as u64
+    }
+
+    /// Get duration since last action (for "last activity" display)
+    pub fn last_activity_ago(&self) -> Option<Duration> {
+        self.last_action_time.map(|t| t.elapsed())
+    }
+
+    /// Format last activity as human-readable string
+    pub fn last_activity_display(&self) -> String {
+        match self.last_activity_ago() {
+            Some(d) => {
+                let secs = d.as_secs();
+                if secs < 60 {
+                    format!("{}s", secs)
+                } else if secs < 3600 {
+                    format!("{}m", secs / 60)
+                } else {
+                    format!("{}h", secs / 3600)
+                }
+            }
+            None => "-".to_string(),
+        }
+    }
+
+    /// Format session duration as human-readable string
+    pub fn session_duration_display(&self) -> String {
+        match self.session_start {
+            Some(start) => {
+                let duration = Utc::now().signed_duration_since(start);
+                let mins = duration.num_minutes();
+                if mins < 60 {
+                    format!("{}m", mins)
+                } else {
+                    format!("{}h {}m", mins / 60, mins % 60)
+                }
+            }
+            None => "-".to_string(),
+        }
     }
 }
 
