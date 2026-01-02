@@ -9,7 +9,8 @@ use crate::validation::rules::{
 
 use super::event_buffer::{BufferedEvent, EventBuffer};
 use super::widgets::{
-    EventViewWidget, HelpWidget, LeaderboardWidget, MetricsWidget, TeamDetailWidget,
+    ActionsTableWidget, HelpWidget, JsonViewerWidget, LeaderboardWidget, MetricsWidget,
+    TeamDetailWidget, WatchlistTableWidget,
 };
 
 use kafka_common::WatchlistEntry;
@@ -93,6 +94,10 @@ pub struct UiState {
     pub current_tab: TopicTab,
     /// Scroll offset for event views (lines from bottom)
     pub event_scroll: usize,
+    /// Selected message index for new_users viewer (0 = newest)
+    pub new_users_selected: usize,
+    /// Vertical scroll offset within the selected new_users message
+    pub new_users_json_scroll: usize,
 }
 
 impl UiState {
@@ -104,6 +109,8 @@ impl UiState {
             table_state: TableState::default(),
             current_tab: TopicTab::default(),
             event_scroll: 0,
+            new_users_selected: 0,
+            new_users_json_scroll: 0,
         }
     }
 
@@ -396,52 +403,67 @@ fn create_demo_state() -> AppState {
     ];
 
     for user in demo_users {
-        let json = serde_json::to_string(&user).unwrap_or_default();
+        let compact = serde_json::to_string(&user).unwrap_or_default();
+        let pretty = serde_json::to_string_pretty(&user).unwrap_or_default();
         app_state
             .new_users_events
-            .push(BufferedEvent::new(json, None));
+            .push(BufferedEvent::new_user(compact, pretty));
     }
 
-    // Demo actions events
+    // Demo actions events (mix of valid and invalid)
     let demo_actions = vec![
-        Action {
-            customer: Some("alice@techcorp.io".to_string()),
-            action_type: Some("CONTACT".to_string()),
-            reason: Some("VIP customer".to_string()),
-            team: "team-1".to_string(),
-        },
-        Action {
-            customer: Some("bob@startup.co".to_string()),
-            action_type: Some("FLAG".to_string()),
-            reason: Some("Suspicious activity".to_string()),
-            team: "team-2".to_string(),
-        },
-        Action {
-            customer: Some("charlie@megacorp.com".to_string()),
-            action_type: Some("CONTACT".to_string()),
-            reason: Some("High value".to_string()),
-            team: "team-1".to_string(),
-        },
-        Action {
-            customer: Some("dave@example.org".to_string()),
-            action_type: Some("FLAG".to_string()),
-            reason: Some("Premium expiring".to_string()),
-            team: "team-3".to_string(),
-        },
-        Action {
-            customer: Some("eve@company.net".to_string()),
-            action_type: Some("CONTACT".to_string()),
-            reason: Some("New signup".to_string()),
-            team: "team-5".to_string(),
-        },
+        (
+            Action {
+                customer: Some("alice@techcorp.io".to_string()),
+                action_type: Some("CONTACT".to_string()),
+                reason: Some("VIP customer".to_string()),
+                team: "team-1".to_string(),
+            },
+            true,
+        ),
+        (
+            Action {
+                customer: Some("bob@startup.co".to_string()),
+                action_type: Some("FLAG".to_string()),
+                reason: Some("Suspicious activity".to_string()),
+                team: "team-2".to_string(),
+            },
+            true,
+        ),
+        (
+            Action {
+                customer: None, // Missing field - invalid
+                action_type: Some("CONTACT".to_string()),
+                reason: Some("High value".to_string()),
+                team: "team-1".to_string(),
+            },
+            false,
+        ),
+        (
+            Action {
+                customer: Some("dave@example.org".to_string()),
+                action_type: Some("FLAG".to_string()),
+                reason: Some("Premium expiring".to_string()),
+                team: "team-3".to_string(),
+            },
+            true,
+        ),
+        (
+            Action {
+                customer: Some("eve@company.net".to_string()),
+                action_type: Some("CONTACT".to_string()),
+                reason: Some("New signup".to_string()),
+                team: "team-5".to_string(),
+            },
+            true,
+        ),
     ];
 
-    for action in demo_actions {
-        let team = action.team.clone();
-        let json = serde_json::to_string(&action).unwrap_or_default();
+    for (action, is_valid) in demo_actions {
+        let compact = serde_json::to_string(&action).unwrap_or_default();
         app_state
             .actions_events
-            .push(BufferedEvent::new(json, Some(team)));
+            .push(BufferedEvent::action(compact, action, is_valid));
     }
 
     // Demo watchlist events
@@ -464,11 +486,10 @@ fn create_demo_state() -> AppState {
     ];
 
     for entry in demo_watchlist {
-        let team = entry.team.clone();
-        let json = serde_json::to_string(&entry).unwrap_or_default();
+        let compact = serde_json::to_string(&entry).unwrap_or_default();
         app_state
             .watchlist_events
-            .push(BufferedEvent::new(json, Some(team)));
+            .push(BufferedEvent::watchlist(compact, entry));
     }
 
     app_state
@@ -842,7 +863,52 @@ async fn run_ui(
                             }
                             _ => {}
                         },
-                        TopicTab::NewUsers | TopicTab::Actions | TopicTab::Watchlist => {
+                        TopicTab::NewUsers => {
+                            // Single-message JSON viewer navigation
+                            match key.code {
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    // Select previous (older) message
+                                    ui_guard.new_users_selected = ui_guard
+                                        .new_users_selected
+                                        .saturating_add(1)
+                                        .min(event_buffer_len.saturating_sub(1));
+                                    ui_guard.new_users_json_scroll = 0; // Reset scroll on message change
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    // Select next (newer) message
+                                    ui_guard.new_users_selected =
+                                        ui_guard.new_users_selected.saturating_sub(1);
+                                    ui_guard.new_users_json_scroll = 0;
+                                }
+                                KeyCode::PageUp => {
+                                    // Scroll JSON content up
+                                    ui_guard.new_users_json_scroll =
+                                        ui_guard.new_users_json_scroll.saturating_add(5);
+                                }
+                                KeyCode::PageDown => {
+                                    // Scroll JSON content down
+                                    ui_guard.new_users_json_scroll =
+                                        ui_guard.new_users_json_scroll.saturating_sub(5);
+                                }
+                                KeyCode::Home => {
+                                    // Jump to newest message
+                                    ui_guard.new_users_selected = 0;
+                                    ui_guard.new_users_json_scroll = 0;
+                                }
+                                KeyCode::End => {
+                                    // Jump to oldest message
+                                    ui_guard.new_users_selected =
+                                        event_buffer_len.saturating_sub(1);
+                                    ui_guard.new_users_json_scroll = 0;
+                                }
+                                KeyCode::Char('h') | KeyCode::Char('?') => {
+                                    ui_guard.view_mode = ViewMode::Help;
+                                }
+                                _ => {}
+                            }
+                        }
+                        TopicTab::Actions | TopicTab::Watchlist => {
+                            // Table view scrolling
                             match key.code {
                                 KeyCode::Up | KeyCode::Char('k') => {
                                     // Scroll up = show older events
@@ -961,15 +1027,19 @@ fn draw_ui(f: &mut Frame, state: &AppState, ui_state: &mut UiState) {
             }
         }
         TopicTab::NewUsers => {
-            EventViewWidget::new(&state.new_users_events, "new_users", ui_state.event_scroll)
-                .render(f, chunks[1]);
+            JsonViewerWidget::new(
+                &state.new_users_events,
+                ui_state.new_users_selected,
+                ui_state.new_users_json_scroll,
+            )
+            .render(f, chunks[1]);
         }
         TopicTab::Actions => {
-            EventViewWidget::new(&state.actions_events, "actions", ui_state.event_scroll)
+            ActionsTableWidget::new(&state.actions_events, ui_state.event_scroll)
                 .render(f, chunks[1]);
         }
         TopicTab::Watchlist => {
-            EventViewWidget::new(&state.watchlist_events, "watchlist", ui_state.event_scroll)
+            WatchlistTableWidget::new(&state.watchlist_events, ui_state.event_scroll)
                 .render(f, chunks[1]);
         }
     }
@@ -1032,19 +1102,48 @@ async fn consume_actions(
 
                     let mut state_guard = state.write().await;
 
-                    // Buffer event for display
+                    // Buffer event for display with parsed data
                     let json_str = String::from_utf8_lossy(payload).to_string();
                     let compact = serde_json::from_str::<serde_json::Value>(&json_str)
                         .map(|v| serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone()))
                         .unwrap_or_else(|_| json_str);
-                    let team_for_event = match &validation {
-                        SimpleValidationResult::Valid { team } => Some(team.clone()),
-                        SimpleValidationResult::MissingFields { team } => Some(team.clone()),
-                        SimpleValidationResult::InvalidJson => extract_team_from_payload(payload),
+
+                    // Create appropriate BufferedEvent based on validation
+                    let event = match &validation {
+                        SimpleValidationResult::Valid { team: _ } => {
+                            // Parse the action for display
+                            if let Ok(action) =
+                                serde_json::from_slice::<kafka_common::Action>(payload)
+                            {
+                                BufferedEvent::action(compact, action, true)
+                            } else {
+                                BufferedEvent::invalid_action(
+                                    compact,
+                                    extract_team_from_payload(payload),
+                                )
+                            }
+                        }
+                        SimpleValidationResult::MissingFields { team: _ } => {
+                            // Parse succeeded but validation failed (missing fields)
+                            if let Ok(action) =
+                                serde_json::from_slice::<kafka_common::Action>(payload)
+                            {
+                                BufferedEvent::action(compact, action, false)
+                            } else {
+                                BufferedEvent::invalid_action(
+                                    compact,
+                                    extract_team_from_payload(payload),
+                                )
+                            }
+                        }
+                        SimpleValidationResult::InvalidJson => {
+                            BufferedEvent::invalid_action(
+                                compact,
+                                extract_team_from_payload(payload),
+                            )
+                        }
                     };
-                    state_guard
-                        .actions_events
-                        .push(BufferedEvent::new(compact, team_for_event));
+                    state_guard.actions_events.push(event);
 
                     // Track messages_consumed for lag calculation (all messages, not just valid)
                     if let Some(team) = match &validation {
@@ -1147,7 +1246,7 @@ async fn consume_watchlist(
                         Ok(entry) => {
                             let mut state_guard = state.write().await;
 
-                            // Buffer event for display
+                            // Buffer event for display with parsed data
                             let json_str = String::from_utf8_lossy(payload).to_string();
                             let compact = serde_json::from_str::<serde_json::Value>(&json_str)
                                 .map(|v| {
@@ -1156,7 +1255,7 @@ async fn consume_watchlist(
                                 .unwrap_or_else(|_| json_str);
                             state_guard
                                 .watchlist_events
-                                .push(BufferedEvent::new(compact, Some(entry.team.clone())));
+                                .push(BufferedEvent::watchlist(compact, entry.clone()));
 
                             if let Some(team_state) = state_guard.teams.get_mut(&entry.team) {
                                 team_state.watchlist_count += 1;
@@ -1207,14 +1306,19 @@ async fn consume_new_users(state: Arc<RwLock<AppState>>, settings: Settings) -> 
         match result {
             Ok(message) => {
                 if let Some(payload) = message.payload() {
-                    // Convert to compact JSON string
+                    // Parse for compact storage and pretty display
                     let json_str = String::from_utf8_lossy(payload).to_string();
-                    let compact = serde_json::from_str::<serde_json::Value>(&json_str)
-                        .map(|v| serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone()))
-                        .unwrap_or_else(|_| json_str);
+                    let (compact, pretty) =
+                        match serde_json::from_str::<serde_json::Value>(&json_str) {
+                            Ok(v) => (
+                                serde_json::to_string(&v).unwrap_or_else(|_| json_str.clone()),
+                                serde_json::to_string_pretty(&v)
+                                    .unwrap_or_else(|_| json_str.clone()),
+                            ),
+                            Err(_) => (json_str.clone(), json_str),
+                        };
 
-                    // No team for new_users (source data from producer)
-                    let event = BufferedEvent::new(compact, None);
+                    let event = BufferedEvent::new_user(compact, pretty);
 
                     let mut state_guard = state.write().await;
                     state_guard.new_users_events.push(event);

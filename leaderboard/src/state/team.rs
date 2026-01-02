@@ -119,18 +119,6 @@ impl TeamState {
             .all(|a| self.achievements.contains(a))
     }
 
-    /// Record a consumption event from new_users topic (for rate tracking)
-    pub fn record_consumption(&mut self) {
-        self.recent_consumed.push_back(Instant::now());
-    }
-
-    /// Record an action production event (for rate tracking)
-    pub fn record_action(&mut self) {
-        let now = Instant::now();
-        self.last_action_time = Some(now);
-        self.recent_actions.push_back(now);
-    }
-
     /// Get consumption rate (messages per minute from new_users)
     pub fn consumption_rate(&mut self) -> u64 {
         let cutoff = Instant::now() - Duration::from_secs(60);
