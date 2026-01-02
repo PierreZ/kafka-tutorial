@@ -69,8 +69,8 @@ impl<'a> MetricsWidget<'a> {
                 let (state_str, state_color) = match group.map(|g| &g.state) {
                     Some(GroupState::Active) => ("Active", Color::Green),
                     Some(GroupState::Rebalancing) => ("Rebalancing", Color::Yellow),
-                    Some(GroupState::Empty) => ("Empty", Color::DarkGray),
-                    Some(GroupState::Unknown) | None => ("Unknown", Color::DarkGray),
+                    Some(GroupState::Empty) => ("Empty", Color::Gray),
+                    Some(GroupState::Unknown) | None => ("Unknown", Color::Gray),
                 };
 
                 // Member count
@@ -102,7 +102,7 @@ impl<'a> MetricsWidget<'a> {
                 } else if consumption_rate > 0 {
                     Color::Cyan
                 } else {
-                    Color::Gray
+                    Color::White
                 };
 
                 Row::new(vec![
@@ -138,7 +138,7 @@ impl<'a> MetricsWidget<'a> {
             .block(Block::default().borders(Borders::ALL).title(title))
             .row_highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(Color::Gray)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(">> ");

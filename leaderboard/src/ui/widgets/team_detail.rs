@@ -74,7 +74,7 @@ impl<'a> TeamDetailWidget<'a> {
             let (status, style) = if self.team.has_achievement(step) {
                 ("DONE", Style::default().fg(Color::Green))
             } else {
-                ("pending", Style::default().fg(Color::DarkGray))
+                ("pending", Style::default().fg(Color::Gray))
             };
             lines.push(Line::from(vec![
                 Span::raw("   "),
@@ -104,7 +104,7 @@ impl<'a> TeamDetailWidget<'a> {
             let (emoji, status, style) = if self.team.has_achievement(bonus) {
                 (bonus.emoji(), "EARNED", Style::default().fg(Color::Magenta))
             } else {
-                ("  ", "locked", Style::default().fg(Color::DarkGray))
+                ("  ", "locked", Style::default().fg(Color::Gray))
             };
             lines.push(Line::from(vec![
                 Span::raw("   "),
@@ -161,7 +161,7 @@ impl<'a> TeamDetailWidget<'a> {
 
     fn render_footer(&self, frame: &mut Frame, area: Rect) {
         let footer = Paragraph::new(" Press Esc or Backspace to return")
-            .style(Style::default().fg(Color::DarkGray).bg(Color::Black))
+            .style(Style::default().fg(Color::Gray).bg(Color::Black))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -175,8 +175,8 @@ impl<'a> TeamDetailWidget<'a> {
             4 => Color::Green,
             3 => Color::Yellow,
             2 => Color::Cyan,
-            1 => Color::Blue,
-            _ => Color::DarkGray,
+            1 => Color::LightBlue,
+            _ => Color::Gray,
         }
     }
 }

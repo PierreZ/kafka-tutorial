@@ -57,7 +57,7 @@ impl<'a> EventViewWidget<'a> {
 
         let mut spans = vec![Span::styled(
             format!("{:>4} ", time_str),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::Gray),
         )];
 
         // Add team badge if present

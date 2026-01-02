@@ -70,11 +70,11 @@ impl<'a> LeaderboardWidget<'a> {
 
                 // Color based on progress
                 let color = match team.step_count() {
-                    4 => Color::Green,    // All done
-                    3 => Color::Yellow,   // Almost there
-                    2 => Color::Cyan,     // Making progress
-                    1 => Color::Blue,     // Started
-                    _ => Color::DarkGray, // Not started
+                    4 => Color::Green,     // All done
+                    3 => Color::Yellow,    // Almost there
+                    2 => Color::Cyan,      // Making progress
+                    1 => Color::LightBlue, // Started
+                    _ => Color::Gray,      // Not started
                 };
 
                 Row::new(vec![
@@ -103,7 +103,7 @@ impl<'a> LeaderboardWidget<'a> {
             .block(Block::default().borders(Borders::ALL).title(title))
             .row_highlight_style(
                 Style::default()
-                    .bg(Color::DarkGray)
+                    .bg(Color::Gray)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(">> ");

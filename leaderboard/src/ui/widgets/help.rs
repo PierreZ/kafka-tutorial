@@ -101,7 +101,7 @@ impl HelpWidget {
         lines.push(Line::from(Span::styled(
             "=== TAB NAVIGATION ===",
             Style::default()
-                .fg(Color::Blue)
+                .fg(Color::LightBlue)
                 .add_modifier(Modifier::BOLD),
         )));
         lines.push(Line::from(""));
