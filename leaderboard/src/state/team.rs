@@ -28,6 +28,8 @@ pub struct TeamState {
     #[serde(skip)]
     pub last_action_time: Option<Instant>, // When last action was produced
     #[serde(skip)]
+    pub last_watchlist_time: Option<Instant>, // When last watchlist message was produced
+    #[serde(skip)]
     pub recent_consumed: VecDeque<Instant>, // Rolling window for consumption rate
     #[serde(skip)]
     pub recent_actions: VecDeque<Instant>, // Rolling window for production rate
@@ -48,6 +50,7 @@ impl TeamState {
             achievement_timestamps: HashMap::new(),
             session_start: None,
             last_action_time: None,
+            last_watchlist_time: None,
             recent_consumed: VecDeque::new(),
             recent_actions: VecDeque::new(),
         }
@@ -141,6 +144,28 @@ impl TeamState {
     /// Format last activity as human-readable string
     pub fn last_activity_display(&self) -> String {
         match self.last_activity_ago() {
+            Some(d) => {
+                let secs = d.as_secs();
+                if secs < 60 {
+                    format!("{}s", secs)
+                } else if secs < 3600 {
+                    format!("{}m", secs / 60)
+                } else {
+                    format!("{}h", secs / 3600)
+                }
+            }
+            None => "-".to_string(),
+        }
+    }
+
+    /// Get duration since last watchlist message
+    pub fn last_watchlist_ago(&self) -> Option<Duration> {
+        self.last_watchlist_time.map(|t| t.elapsed())
+    }
+
+    /// Format last watchlist activity as human-readable string
+    pub fn last_watchlist_display(&self) -> String {
+        match self.last_watchlist_ago() {
             Some(d) => {
                 let secs = d.as_secs();
                 if secs < 60 {

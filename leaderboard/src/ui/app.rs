@@ -1259,6 +1259,7 @@ async fn consume_watchlist(
 
                             if let Some(team_state) = state_guard.teams.get_mut(&entry.team) {
                                 team_state.watchlist_count += 1;
+                                team_state.last_watchlist_time = Some(Instant::now());
                                 // Unlock WatchlistDone on first watchlist message
                                 if team_state.unlock_achievement(AchievementType::WatchlistDone) {
                                     info!("{} unlocked WatchlistDone achievement", entry.team);

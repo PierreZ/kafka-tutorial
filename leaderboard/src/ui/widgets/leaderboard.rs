@@ -1,5 +1,5 @@
 use crate::state::achievements::AchievementType;
-use crate::state::team::{ConsumerGroupStatus, TeamState};
+use crate::state::team::{ConsumerGroupStatus, GroupState, TeamState};
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
@@ -11,7 +11,7 @@ use std::time::Instant;
 
 pub struct LeaderboardWidget<'a> {
     teams: &'a [TeamState],
-    consumer_groups: &'a HashMap<String, u32>, // team_name -> member count
+    consumer_groups: &'a HashMap<String, ConsumerGroupStatus>,
     last_update: Option<Instant>,
     selected_index: Option<usize>,
     total_teams: usize,
@@ -20,7 +20,7 @@ pub struct LeaderboardWidget<'a> {
 impl<'a> LeaderboardWidget<'a> {
     pub fn new(
         teams: &'a [TeamState],
-        consumer_groups: &'a HashMap<String, u32>,
+        consumer_groups: &'a HashMap<String, ConsumerGroupStatus>,
         last_update: Option<Instant>,
         selected_index: Option<usize>,
         total_teams: usize,
@@ -34,11 +34,13 @@ impl<'a> LeaderboardWidget<'a> {
         }
     }
 
-    /// Build consumer groups map from status list
-    pub fn build_consumer_map(statuses: &[ConsumerGroupStatus]) -> HashMap<String, u32> {
+    /// Build consumer groups map from status list (full status version)
+    pub fn build_consumer_map(
+        statuses: &[ConsumerGroupStatus],
+    ) -> HashMap<String, ConsumerGroupStatus> {
         statuses
             .iter()
-            .map(|s| (s.team_name.clone(), s.members))
+            .map(|s| (s.team_name.clone(), s.clone()))
             .collect()
     }
 
@@ -46,10 +48,15 @@ impl<'a> LeaderboardWidget<'a> {
     pub fn render_stateful(&self, frame: &mut Frame, area: Rect, table_state: &mut TableState) {
         let header = Row::new(vec![
             Cell::from("Team"),
-            Cell::from("Achievements"),
-            Cell::from("Errors"),
-            Cell::from("👥"),
-            Cell::from("📤"),
+            Cell::from("S1"),
+            Cell::from("S2"),
+            Cell::from("S3"),
+            Cell::from("S4"),
+            Cell::from("Bonus"),
+            Cell::from("Consumers"),
+            Cell::from("Lag"),
+            Cell::from("Last actions"),
+            Cell::from("Last watchlist"),
         ])
         .style(Style::default().add_modifier(Modifier::BOLD))
         .height(1);
@@ -59,17 +66,26 @@ impl<'a> LeaderboardWidget<'a> {
             .teams
             .iter()
             .map(|team| {
-                // All achievements (steps + bonus)
-                let achievements = self.format_all_achievements(team);
+                let steps = AchievementType::all_steps();
 
-                // Error emojis with counts
-                let errors = self.format_errors(team);
+                // Step checkmarks
+                let s1 = self.format_step_checkmark(team, steps[0]);
+                let s2 = self.format_step_checkmark(team, steps[1]);
+                let s3 = self.format_step_checkmark(team, steps[2]);
+                let s4 = self.format_step_checkmark(team, steps[3]);
 
-                // Consumer count
-                let consumers = self.consumer_groups.get(&team.team_name).unwrap_or(&0);
+                // Bonus achievements (compact)
+                let bonus = self.format_bonus_compact(team);
 
-                // Color based on progress
-                let color = match team.step_count() {
+                // Consumer count and lag from consumer group
+                let (consumers, lag, lag_color) = self.format_consumer_info(&team.team_name);
+
+                // Last activity times
+                let last_actions = team.last_activity_display();
+                let last_watchlist = team.last_watchlist_display();
+
+                // Row color based on progress
+                let row_color = match team.step_count() {
                     4 => Color::Green,     // All done
                     3 => Color::Yellow,    // Almost there
                     2 => Color::Cyan,      // Making progress
@@ -79,21 +95,31 @@ impl<'a> LeaderboardWidget<'a> {
 
                 Row::new(vec![
                     Cell::from(team.team_name.clone()),
-                    Cell::from(achievements),
-                    Cell::from(errors),
-                    Cell::from(format!("{}", consumers)),
-                    Cell::from(format!("{}", team.action_count)),
+                    Cell::from(s1.0).style(Style::default().fg(s1.1)),
+                    Cell::from(s2.0).style(Style::default().fg(s2.1)),
+                    Cell::from(s3.0).style(Style::default().fg(s3.1)),
+                    Cell::from(s4.0).style(Style::default().fg(s4.1)),
+                    Cell::from(bonus),
+                    Cell::from(consumers),
+                    Cell::from(lag).style(Style::default().fg(lag_color)),
+                    Cell::from(last_actions),
+                    Cell::from(last_watchlist),
                 ])
-                .style(Style::default().fg(color))
+                .style(Style::default().fg(row_color))
             })
             .collect();
 
         let widths = [
             Constraint::Length(10), // Team
-            Constraint::Length(32), // Achievements (steps + bonus emojis)
-            Constraint::Length(12), // Errors
-            Constraint::Length(4),  // 👥
-            Constraint::Length(8),  // 📤
+            Constraint::Length(2),  // S1
+            Constraint::Length(2),  // S2
+            Constraint::Length(2),  // S3
+            Constraint::Length(2),  // S4
+            Constraint::Length(12), // Bonus
+            Constraint::Length(9),  // Consumers
+            Constraint::Length(4),  // Lag
+            Constraint::Length(12), // Last actions
+            Constraint::Length(14), // Last watchlist
         ];
 
         let title = self.build_title();
@@ -112,6 +138,13 @@ impl<'a> LeaderboardWidget<'a> {
     }
 
     fn build_title(&self) -> String {
+        // Count active teams
+        let active_count = self
+            .consumer_groups
+            .values()
+            .filter(|s| matches!(s.state, GroupState::Active))
+            .count();
+
         let freshness = match self.last_update {
             Some(instant) => {
                 let elapsed = instant.elapsed().as_secs();
@@ -132,50 +165,47 @@ impl<'a> LeaderboardWidget<'a> {
         };
 
         format!(
-            " KAFKA TUTORIAL - Steps: 🔗📤⚡👁 | Bonus: 🔬📈✨⚔🚀🏆 | {} | {} ",
-            position, freshness
+            " KAFKA LEADERBOARD | {}/{} active | {} | {} ",
+            active_count, self.total_teams, position, freshness
         )
     }
 
-    fn format_all_achievements(&self, team: &TeamState) -> String {
-        let mut achievements = String::new();
-
-        // Step achievements: show emoji if achieved, dot if not
-        for step in AchievementType::all_steps() {
-            if team.has_achievement(step) {
-                achievements.push_str(step.emoji());
-            } else {
-                achievements.push('·');
-            }
+    /// Format step achievement as checkmark or dot
+    fn format_step_checkmark(&self, team: &TeamState, step: AchievementType) -> (String, Color) {
+        if team.has_achievement(step) {
+            ("✓".to_string(), Color::Green)
+        } else {
+            ("·".to_string(), Color::Gray)
         }
-
-        // Add separator if team has any bonus achievements
-        let has_bonus = AchievementType::all_bonus()
-            .iter()
-            .any(|a| team.has_achievement(*a));
-        if has_bonus {
-            achievements.push(' ');
-        }
-
-        // Bonus achievements (only show if earned)
-        for bonus in AchievementType::all_bonus() {
-            if team.has_achievement(bonus) {
-                achievements.push_str(bonus.emoji());
-            }
-        }
-
-        achievements
     }
 
-    fn format_errors(&self, team: &TeamState) -> String {
-        let mut errors = String::new();
-        for error in AchievementType::all_errors() {
-            let count = team.get_error_count(error);
-            if count > 0 {
-                errors.push_str(error.emoji());
-                errors.push_str(&format!("x{} ", count));
+    /// Format bonus achievements compactly (only show earned emojis)
+    fn format_bonus_compact(&self, team: &TeamState) -> String {
+        let mut bonus = String::new();
+        for b in AchievementType::all_bonus() {
+            if team.has_achievement(b) {
+                bonus.push_str(b.emoji());
             }
         }
-        errors.trim_end().to_string()
+        bonus
+    }
+
+    /// Get consumer count, lag, and lag color from consumer group status
+    fn format_consumer_info(&self, team_name: &str) -> (String, String, Color) {
+        match self.consumer_groups.get(team_name) {
+            Some(status) => {
+                let consumers = format!("{}", status.members);
+                let lag = format!("{}", status.lag);
+                let lag_color = if status.lag <= 10 {
+                    Color::Green
+                } else if status.lag <= 50 {
+                    Color::Yellow
+                } else {
+                    Color::Red
+                };
+                (consumers, lag, lag_color)
+            }
+            None => ("0".to_string(), "-".to_string(), Color::Gray),
+        }
     }
 }
