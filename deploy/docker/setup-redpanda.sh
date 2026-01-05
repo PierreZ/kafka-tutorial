@@ -126,6 +126,12 @@ docker exec "$CONTAINER_NAME" rpk acl create \
 docker exec "$CONTAINER_NAME" rpk acl create \
     --allow-principal "User:leaderboard" \
     --operation read --operation describe \
+    --topic new_users \
+    $AUTH_FLAGS >/dev/null
+
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:leaderboard" \
+    --operation read --operation describe \
     --topic actions \
     $AUTH_FLAGS >/dev/null
 
