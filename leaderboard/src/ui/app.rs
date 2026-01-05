@@ -526,6 +526,8 @@ pub async fn run(settings: Settings) -> Result<()> {
         &settings.kafka.brokers,
         &settings.kafka.username,
         &settings.kafka.password,
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
         &settings.topics.scorer_state,
     )
     .await
@@ -597,6 +599,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                 &settings_clone.kafka.brokers,
                 &settings_clone.kafka.username,
                 &settings_clone.kafka.password,
+                &settings_clone.kafka.security_protocol,
+                &settings_clone.kafka.sasl_mechanism,
             )
             .await;
 
@@ -605,6 +609,8 @@ pub async fn run(settings: Settings) -> Result<()> {
                 &settings_clone.kafka.brokers,
                 &settings_clone.kafka.username,
                 &settings_clone.kafka.password,
+                &settings_clone.kafka.security_protocol,
+                &settings_clone.kafka.sasl_mechanism,
                 &settings_clone.topics.new_users,
             )
             .ok();

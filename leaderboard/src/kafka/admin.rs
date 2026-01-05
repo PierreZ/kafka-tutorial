@@ -19,10 +19,12 @@ pub async fn fetch_consumer_group_statuses(
     brokers: &str,
     username: &str,
     password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
 ) -> Vec<ConsumerGroupStatus> {
     // Create a consumer to fetch group list
     let consumer: BaseConsumer =
-        match kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+        match kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
             .set("group.id", "leaderboard-group-monitor")
             .create()
         {
@@ -102,10 +104,12 @@ pub fn fetch_topic_high_watermark(
     brokers: &str,
     username: &str,
     password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
     topic: &str,
 ) -> Result<i64> {
     let consumer: BaseConsumer =
-        kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+        kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
             .set("group.id", "leaderboard-watermark-check")
             .create()?;
 

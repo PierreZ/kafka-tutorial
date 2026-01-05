@@ -43,12 +43,14 @@ pub async fn restore_states(
     brokers: &str,
     username: &str,
     password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
     topic: &str,
 ) -> Result<HashMap<String, TeamState>> {
     info!("Restoring state from topic: {}", topic);
 
     let consumer: StreamConsumer =
-        kafka_common::kafka::new_sasl_ssl_config(brokers, username, password)
+        kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
             .set("group.id", "leaderboard-state-restore")
             .set("enable.auto.commit", "false")
             .set("auto.offset.reset", "earliest")

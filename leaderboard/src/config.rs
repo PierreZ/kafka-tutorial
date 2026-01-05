@@ -25,7 +25,7 @@ pub struct KafkaSettings {
 }
 
 fn default_security_protocol() -> String {
-    "SASL_SSL".to_string()
+    "SASL_PLAINTEXT".to_string()
 }
 
 fn default_sasl_mechanism() -> String {
