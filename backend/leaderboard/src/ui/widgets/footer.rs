@@ -65,7 +65,11 @@ fn render_celebration(frame: &mut Frame, area: Rect, celebration: &Celebration) 
         ),
         Span::raw(" earned "),
         Span::styled(
-            format!("{} {}", celebration.achievement.emoji(), celebration.achievement.name()),
+            format!(
+                "{} {}",
+                celebration.achievement.emoji(),
+                celebration.achievement.name()
+            ),
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),

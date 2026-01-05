@@ -155,6 +155,14 @@ docker exec "$CONTAINER_NAME" rpk acl create \
     --resource-pattern-type prefixed \
     $AUTH_FLAGS >/dev/null
 
+# Leaderboard needs to read team consumer groups for lag tracking
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:leaderboard" \
+    --operation read --operation describe \
+    --group "team-" \
+    --resource-pattern-type prefixed \
+    $AUTH_FLAGS >/dev/null
+
 # Create team-admin ACLs (same as teams)
 echo "Setting up ACLs for team-admin..."
 

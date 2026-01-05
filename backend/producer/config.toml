@@ -1,4 +1,4 @@
-interval_millis=1000
+interval_millis=100
 topic="new_users"
 brokers="localhost:9092"
 username="admin"

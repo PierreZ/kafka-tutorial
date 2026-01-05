@@ -49,12 +49,17 @@ pub async fn restore_states(
 ) -> Result<HashMap<String, TeamState>> {
     info!("Restoring state from topic: {}", topic);
 
-    let consumer: StreamConsumer =
-        kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
-            .set("group.id", "leaderboard-state-restore")
-            .set("enable.auto.commit", "false")
-            .set("auto.offset.reset", "earliest")
-            .create()?;
+    let consumer: StreamConsumer = kafka_common::kafka::new_sasl_config(
+        brokers,
+        username,
+        password,
+        security_protocol,
+        sasl_mechanism,
+    )
+    .set("group.id", "leaderboard-state-restore")
+    .set("enable.auto.commit", "false")
+    .set("auto.offset.reset", "earliest")
+    .create()?;
 
     // Subscribe to the topic
     consumer.subscribe(&[topic])?;

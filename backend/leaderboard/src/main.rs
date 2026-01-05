@@ -38,10 +38,13 @@ async fn main() -> Result<()> {
     let log_file = File::create(&args.log_file)?;
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
-        .with(tracing_subscriber::fmt::layer().with_writer(log_file).with_ansi(false))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(log_file)
+                .with_ansi(false),
+        )
         .init();
 
     if args.demo {

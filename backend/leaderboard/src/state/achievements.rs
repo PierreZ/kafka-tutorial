@@ -31,9 +31,9 @@ impl AchievementType {
     pub fn emoji(&self) -> &'static str {
         match self {
             // Step emojis - distinct visual for each tutorial step
-            AchievementType::Connected => "🔌",     // Plug = connection
-            AchievementType::FirstLoad => "📤",     // Outbox = producing
-            AchievementType::Scaled => "⚖️",        // Balance = scaling
+            AchievementType::Connected => "🔌", // Plug = connection
+            AchievementType::FirstLoad => "📤", // Outbox = producing
+            AchievementType::Scaled => "⚖️",    // Balance = scaling
             AchievementType::WatchlistDone => "📋", // Clipboard = watchlist
             // Error indicators
             AchievementType::ParseError => "🔴",

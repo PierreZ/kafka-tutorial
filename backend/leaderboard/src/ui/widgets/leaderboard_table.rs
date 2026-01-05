@@ -1,6 +1,6 @@
 //! Leaderboard table widget - compact table with all teams
 
-use crate::state::{AchievementType, GroupState, TeamState, STEP_INCOMPLETE};
+use crate::state::{AchievementType, TeamState, STEP_INCOMPLETE};
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
@@ -10,17 +10,10 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
-/// Status icons
-pub const STATUS_OK: &str = "✅";
-pub const STATUS_ERROR: &str = "🔴";
-pub const STATUS_DISCONNECTED: &str = "🟡";
-pub const STATUS_PENDING: &str = "⚪";
-
 /// Data for rendering the leaderboard table
 pub struct LeaderboardTableData<'a> {
     pub teams: &'a HashMap<String, TeamState>,
     pub consumer_counts: &'a HashMap<String, u32>,
-    pub group_states: &'a HashMap<String, GroupState>,
     pub selected_row: usize,
     pub celebration_team: Option<&'a str>,
 }
@@ -68,30 +61,6 @@ fn get_progress_emojis(state: &TeamState) -> String {
     progress
 }
 
-/// Get status icon for a team
-fn get_status_icon(state: &TeamState, group_state: Option<&GroupState>) -> &'static str {
-    // Check for disconnected first
-    if let Some(gs) = group_state {
-        if *gs == GroupState::Empty {
-            return STATUS_DISCONNECTED;
-        }
-    }
-
-    // Check for errors
-    let parse_errors = state.get_error_count(AchievementType::ParseError);
-    let field_errors = state.get_error_count(AchievementType::MissingFields);
-    if parse_errors > 0 || field_errors > 0 {
-        return STATUS_ERROR;
-    }
-
-    // Check if connected
-    if state.has_achievement(AchievementType::Connected) {
-        return STATUS_OK;
-    }
-
-    STATUS_PENDING
-}
-
 /// Get bonus achievements emoji string
 fn get_bonus_emojis(state: &TeamState) -> String {
     let mut bonus = String::new();
@@ -119,9 +88,7 @@ fn format_lag(lag: i64, connected: bool) -> String {
     if !connected {
         return "-".to_string();
     }
-    if lag >= 10000 {
-        format!("{:.1}k", lag as f64 / 1000.0)
-    } else if lag >= 1000 {
+    if lag >= 1000 {
         format!("{:.1}k", lag as f64 / 1000.0)
     } else {
         format!("{}", lag)
@@ -144,12 +111,10 @@ pub fn render(
             let rank = idx + 1;
             let state = data.teams.get(team_name);
             let consumer_count = data.consumer_counts.get(team_name).copied().unwrap_or(0);
-            let group_state = data.group_states.get(team_name);
 
-            let (progress, status, lag, actions, bonus, step_count) = match state {
+            let (progress, lag, actions, watchlist, bonus, step_count) = match state {
                 Some(s) => {
                     let progress = get_progress_emojis(s);
-                    let status = get_status_icon(s, group_state);
                     let connected = s.has_achievement(AchievementType::Connected);
                     let lag = format_lag(s.current_lag, connected);
                     let actions = if s.action_count > 0 {
@@ -157,8 +122,13 @@ pub fn render(
                     } else {
                         "-".to_string()
                     };
+                    let watchlist = if s.watchlist_count > 0 {
+                        format!("{}", s.watchlist_count)
+                    } else {
+                        "-".to_string()
+                    };
                     let bonus = get_bonus_emojis(s);
-                    (progress, status, lag, actions, bonus, s.step_count())
+                    (progress, lag, actions, watchlist, bonus, s.step_count())
                 }
                 None => {
                     let progress = format!(
@@ -167,7 +137,7 @@ pub fn render(
                     );
                     (
                         progress,
-                        STATUS_PENDING,
+                        "-".to_string(),
                         "-".to_string(),
                         "-".to_string(),
                         String::new(),
@@ -206,10 +176,10 @@ pub fn render(
                 Cell::from(rank_display),
                 Cell::from(team_name.clone()),
                 Cell::from(progress),
-                Cell::from(status),
                 Cell::from(format!("{:>2}", consumer_count)),
                 Cell::from(format!("{:>5}", lag)),
                 Cell::from(format!("{:>5}", actions)),
+                Cell::from(format!("{:>5}", watchlist)),
                 Cell::from(bonus),
             ])
             .style(style)
@@ -218,14 +188,14 @@ pub fn render(
 
     // Column widths - optimized for compact display
     let widths = [
-        Constraint::Length(3),  // Rank
-        Constraint::Length(8),  // Team
-        Constraint::Length(9),  // Progress (4 emojis)
-        Constraint::Length(2),  // Status
-        Constraint::Length(3),  // Consumers
-        Constraint::Length(6),  // Lag
-        Constraint::Length(6),  // Actions
-        Constraint::Min(6),     // Bonus (flexible)
+        Constraint::Length(3), // Rank
+        Constraint::Length(8), // Team
+        Constraint::Length(9), // Progress (4 emojis)
+        Constraint::Length(4), // Instances
+        Constraint::Length(6), // Lag
+        Constraint::Length(6), // Actions
+        Constraint::Length(6), // Watchlist
+        Constraint::Min(6),    // Bonus (flexible)
     ];
 
     // Header
@@ -233,13 +203,17 @@ pub fn render(
         Cell::from(" #"),
         Cell::from("Team"),
         Cell::from("Progress"),
-        Cell::from(""),
-        Cell::from(""),
+        Cell::from("Inst"),
         Cell::from("  Lag"),
-        Cell::from("  Act"),
+        Cell::from("Action"),
+        Cell::from(" Watch"),
         Cell::from("Bonus"),
     ])
-    .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::DarkGray))
+    .style(
+        Style::default()
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::DarkGray),
+    )
     .height(1);
 
     let table = Table::new(rows, widths)
@@ -248,9 +222,10 @@ pub fn render(
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::DarkGray))
-                .title(Line::from(vec![
-                    Span::styled(" Teams ", Style::default().fg(Color::White)),
-                ])),
+                .title(Line::from(vec![Span::styled(
+                    " Teams ",
+                    Style::default().fg(Color::White),
+                )])),
         )
         .row_highlight_style(Style::default());
 

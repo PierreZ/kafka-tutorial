@@ -112,6 +112,10 @@ impl TeamSimulator {
 
     async fn produce(&self, topic: &str, value: &str, key: &str) {
         let record = FutureRecord::to(topic).payload(value).key(key);
+        debug!(
+            "team-{}: Producing to {} (key={:?}, len={})",
+            self.team_number, topic, key, value.len()
+        );
         if let Err((e, _)) = self.producer.send(record, Duration::from_secs(0)).await {
             error!("Failed to produce to {}: {}", topic, e);
         }

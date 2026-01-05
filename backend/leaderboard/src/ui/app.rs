@@ -215,7 +215,7 @@ pub async fn run(settings: Settings) -> Result<()> {
             {
                 warn!("Admin monitoring error: {:?}", e);
             }
-            tokio::time::sleep(Duration::from_secs(10)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }
     });
 
@@ -246,9 +246,7 @@ pub async fn run_demo() -> Result<()> {
             team.watchlist_count = 5;
             team.current_lag = 0;
         }
-        app_state
-            .consumer_counts
-            .insert("team-1".to_string(), 3);
+        app_state.consumer_counts.insert("team-1".to_string(), 3);
         app_state
             .group_states
             .insert("team-1".to_string(), GroupState::Active);
@@ -262,9 +260,7 @@ pub async fn run_demo() -> Result<()> {
             team.action_count = 120;
             team.current_lag = 15;
         }
-        app_state
-            .consumer_counts
-            .insert("team-2".to_string(), 2);
+        app_state.consumer_counts.insert("team-2".to_string(), 2);
         app_state
             .group_states
             .insert("team-2".to_string(), GroupState::Active);
@@ -279,9 +275,7 @@ pub async fn run_demo() -> Result<()> {
             team.action_count = 45;
             team.current_lag = 89;
         }
-        app_state
-            .consumer_counts
-            .insert("team-3".to_string(), 1);
+        app_state.consumer_counts.insert("team-3".to_string(), 1);
         app_state
             .group_states
             .insert("team-3".to_string(), GroupState::Active);
@@ -292,9 +286,7 @@ pub async fn run_demo() -> Result<()> {
             team.action_count = 5;
             team.current_lag = 45;
         }
-        app_state
-            .consumer_counts
-            .insert("team-4".to_string(), 1);
+        app_state.consumer_counts.insert("team-4".to_string(), 1);
         app_state
             .group_states
             .insert("team-4".to_string(), GroupState::Active);
@@ -457,7 +449,6 @@ fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, sett
         let table_data = leaderboard_table::LeaderboardTableData {
             teams: &app_state.teams,
             consumer_counts: &app_state.consumer_counts,
-            group_states: &app_state.group_states,
             selected_row: ui_state.selected_row,
             celebration_team,
         };
@@ -496,7 +487,6 @@ fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, sett
         let table_data = leaderboard_table::LeaderboardTableData {
             teams: &app_state.teams,
             consumer_counts: &app_state.consumer_counts,
-            group_states: &app_state.group_states,
             selected_row: ui_state.selected_row,
             celebration_team,
         };
@@ -571,7 +561,8 @@ async fn consume_actions(
                                 let clean_streak = team.clean_streak_count;
 
                                 // Check achievements
-                                let first_load = team.unlock_achievement(AchievementType::FirstLoad);
+                                let first_load =
+                                    team.unlock_achievement(AchievementType::FirstLoad);
                                 let high_throughput = action_count >= thresholds.0
                                     && team.unlock_achievement(AchievementType::HighThroughput);
                                 let clean_streak_ach = clean_streak >= thresholds.1
@@ -613,7 +604,8 @@ async fn consume_actions(
                         }
                         SimpleValidationResult::InvalidJson => {
                             // Try to extract team name from raw JSON
-                            if let Some(team_name) = validation::extract_team_from_payload(payload) {
+                            if let Some(team_name) = validation::extract_team_from_payload(payload)
+                            {
                                 if let Some(team) = app_state.teams.get_mut(&team_name) {
                                     team.record_error(AchievementType::ParseError);
                                 }
@@ -754,51 +746,61 @@ async fn monitor_consumer_groups(
         let mut should_persist = false;
 
         if let Some(team) = app_state.teams.get_mut(&team_name) {
-            // Update lag
-            team.update_lag(status.lag);
+            // Fetch actual lag from consumer group committed offsets
+            if let Some(lag) = admin::fetch_consumer_group_lag(
+                &settings.kafka.brokers,
+                &settings.kafka.username,
+                &settings.kafka.password,
+                &settings.kafka.security_protocol,
+                &settings.kafka.sasl_mechanism,
+                &team_name,
+                &settings.topics.new_users,
+            ) {
+                team.update_lag(lag);
+            }
 
             // Check Connected achievement
-            if status.state == GroupState::Active {
-                if team.unlock_achievement(AchievementType::Connected) {
-                    celebrations.push(AchievementType::Connected);
-                    should_persist = true;
+            if status.state == GroupState::Active
+                && team.unlock_achievement(AchievementType::Connected)
+            {
+                celebrations.push(AchievementType::Connected);
+                should_persist = true;
 
-                    // Check First Blood
-                    if !first_blood_given {
-                        team.unlock_achievement(AchievementType::FirstBlood);
-                        celebrations.push(AchievementType::FirstBlood);
-                        first_blood_given = true;
-                    }
+                // Check First Blood
+                if !first_blood_given {
+                    team.unlock_achievement(AchievementType::FirstBlood);
+                    celebrations.push(AchievementType::FirstBlood);
+                    first_blood_given = true;
                 }
             }
 
             // Check Scaled achievement
-            if status.members >= settings.achievements.scaled_members {
-                if team.unlock_achievement(AchievementType::Scaled) {
-                    celebrations.push(AchievementType::Scaled);
-                    should_persist = true;
-                }
+            if status.members >= settings.achievements.scaled_members
+                && team.unlock_achievement(AchievementType::Scaled)
+            {
+                celebrations.push(AchievementType::Scaled);
+                should_persist = true;
             }
 
             // Check Partition Explorer achievement
-            if status.members >= settings.achievements.partition_explorer_members {
-                if team.unlock_achievement(AchievementType::PartitionExplorer) {
-                    celebrations.push(AchievementType::PartitionExplorer);
-                }
+            if status.members >= settings.achievements.partition_explorer_members
+                && team.unlock_achievement(AchievementType::PartitionExplorer)
+            {
+                celebrations.push(AchievementType::PartitionExplorer);
             }
 
             // Check Lag Buster achievement
-            if team.qualifies_for_lag_buster(settings.achievements.lag_buster_threshold) {
-                if team.unlock_achievement(AchievementType::LagBuster) {
-                    celebrations.push(AchievementType::LagBuster);
-                }
+            if team.qualifies_for_lag_buster(settings.achievements.lag_buster_threshold)
+                && team.unlock_achievement(AchievementType::LagBuster)
+            {
+                celebrations.push(AchievementType::LagBuster);
             }
 
             // Check Champion achievement
-            if team.has_all_champion_requirements() {
-                if team.unlock_achievement(AchievementType::Champion) {
-                    celebrations.push(AchievementType::Champion);
-                }
+            if team.has_all_champion_requirements()
+                && team.unlock_achievement(AchievementType::Champion)
+            {
+                celebrations.push(AchievementType::Champion);
             }
         }
 

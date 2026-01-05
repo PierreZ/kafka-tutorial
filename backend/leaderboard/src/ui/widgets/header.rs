@@ -107,7 +107,7 @@ fn render_line1(frame: &mut Frame, area: Rect, data: &HeaderData) {
         Span::raw("  "),
         live_span,
         Span::raw("  "),
-        Span::styled(format!("{}", duration), Style::default().fg(Color::DarkGray)),
+        Span::styled(duration.to_string(), Style::default().fg(Color::DarkGray)),
         Span::raw("  "),
         Span::styled(
             format!("{} actions", total_actions),
@@ -145,11 +145,7 @@ fn render_line2(frame: &mut Frame, area: Rect, data: &HeaderData) {
         let filled = ((count as f32 / total) * bar_width as f32).round() as usize;
         let empty = bar_width.saturating_sub(filled);
 
-        let bar = format!(
-            "{}{}",
-            "█".repeat(filled),
-            "░".repeat(empty)
-        );
+        let bar = format!("{}{}", "█".repeat(filled), "░".repeat(empty));
 
         spans.push(Span::styled(
             format!("{}: ", step_labels[i]),

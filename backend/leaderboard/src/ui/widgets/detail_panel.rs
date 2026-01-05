@@ -133,8 +133,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &DetailPanelData) {
                 } else {
                     format!(
                         "{}/{}",
-                        data.consumer_count,
-                        data.achievement_settings.partition_explorer_members
+                        data.consumer_count, data.achievement_settings.partition_explorer_members
                     )
                 }
             }
@@ -170,9 +169,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &DetailPanelData) {
             .add_modifier(Modifier::BOLD),
     )]));
 
-    let parse_errors = data
-        .team_state
-        .get_error_count(AchievementType::ParseError);
+    let parse_errors = data.team_state.get_error_count(AchievementType::ParseError);
     let field_errors = data
         .team_state
         .get_error_count(AchievementType::MissingFields);
@@ -197,7 +194,10 @@ pub fn render(frame: &mut Frame, area: Rect, data: &DetailPanelData) {
     for (label, value) in stats {
         lines.push(Line::from(vec![
             Span::raw(" "),
-            Span::styled(format!("{:<10}", label), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:<10}", label),
+                Style::default().fg(Color::DarkGray),
+            ),
             Span::styled(value, Style::default().fg(Color::White)),
         ]));
     }
