@@ -13,6 +13,18 @@ pub struct Settings {
     pub brokers: String,
     pub username: String,
     pub password: String,
+    #[serde(default = "default_security_protocol")]
+    pub security_protocol: String,
+    #[serde(default = "default_sasl_mechanism")]
+    pub sasl_mechanism: String,
+}
+
+fn default_security_protocol() -> String {
+    "SASL_SSL".to_string()
+}
+
+fn default_sasl_mechanism() -> String {
+    "PLAIN".to_string()
 }
 
 // https://github.com/mehcode/config-rs/blob/master/examples/hierarchical-env/src/settings.rs#L39
@@ -28,15 +40,22 @@ impl Settings {
 }
 
 pub async fn produce(settings: &Settings) {
-    let producer: &FutureProducer = &kafka_common::kafka::new_sasl_ssl_config(
+    let producer: &FutureProducer = &kafka_common::kafka::new_sasl_config(
         &settings.brokers,
         &settings.username,
         &settings.password,
+        &settings.security_protocol,
+        &settings.sasl_mechanism,
     )
     .set("client.id", "kafka-demo-producer")
     .set("message.timeout.ms", "5000")
     .create()
     .expect("Producer creation error");
+
+    info!(
+        "Connected to {} (protocol: {}, mechanism: {}), producing to topic '{}'",
+        settings.brokers, settings.security_protocol, settings.sasl_mechanism, settings.topic
+    );
 
     let mut interval = time::interval(Duration::from_millis(settings.interval_millis));
 

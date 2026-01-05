@@ -18,6 +18,18 @@ pub struct KafkaSettings {
     pub username: String,
     pub password: String,
     pub consumer_group: String,
+    #[serde(default = "default_security_protocol")]
+    pub security_protocol: String,
+    #[serde(default = "default_sasl_mechanism")]
+    pub sasl_mechanism: String,
+}
+
+fn default_security_protocol() -> String {
+    "SASL_SSL".to_string()
+}
+
+fn default_sasl_mechanism() -> String {
+    "PLAIN".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -1,5 +1,7 @@
 interval_millis=1000
 topic="new_users"
-brokers="zzz.europe-west1.gcp.confluent.cloud:9092"
-username=""
-password=""
+brokers="localhost:9092"
+username="admin"
+password="admin-secret"
+security_protocol="SASL_PLAINTEXT"
+sasl_mechanism="SCRAM-SHA-256"

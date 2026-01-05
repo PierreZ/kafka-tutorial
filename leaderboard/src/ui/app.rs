@@ -1,5 +1,5 @@
 use crate::config::Settings;
-use crate::kafka::{admin, consumer::create_consumer, producer::create_producer};
+use crate::kafka::{admin, consumer::{create_consumer, test_connection}, producer::create_producer};
 use crate::state::achievements::AchievementType;
 use crate::state::persistence::{persist_state, restore_states};
 use crate::state::team::{ConsumerGroupStatus, GroupState, TeamState};
@@ -250,6 +250,8 @@ fn create_demo_state() -> AppState {
             username: "demo".to_string(),
             password: "demo".to_string(),
             consumer_group: "demo".to_string(),
+            security_protocol: "SASL_SSL".to_string(),
+            sasl_mechanism: "PLAIN".to_string(),
         },
         topics: TopicSettings {
             new_users: "new_users".to_string(),
@@ -496,6 +498,17 @@ fn create_demo_state() -> AppState {
 }
 
 pub async fn run(settings: Settings) -> Result<()> {
+    // Test Kafka connection before starting - fail fast if not available
+    info!("Testing Kafka connection...");
+    test_connection(
+        &settings.kafka.brokers,
+        &settings.kafka.username,
+        &settings.kafka.password,
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
+    )?;
+    info!("Kafka connection successful");
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -541,6 +554,8 @@ pub async fn run(settings: Settings) -> Result<()> {
         &settings.kafka.brokers,
         &settings.kafka.username,
         &settings.kafka.password,
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
     )?;
 
     // Spawn actions consumer task
@@ -1087,6 +1102,8 @@ async fn consume_actions(
         &settings.kafka.username,
         &settings.kafka.password,
         &format!("{}-actions", settings.kafka.consumer_group),
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
     )?;
 
     consumer.subscribe(&[&settings.topics.actions])?;
@@ -1231,6 +1248,8 @@ async fn consume_watchlist(
         &settings.kafka.username,
         &settings.kafka.password,
         &format!("{}-watchlist", settings.kafka.consumer_group),
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
     )?;
 
     consumer.subscribe(&[&settings.topics.watchlist])?;
@@ -1296,6 +1315,8 @@ async fn consume_new_users(state: Arc<RwLock<AppState>>, settings: Settings) -> 
         &settings.kafka.username,
         &settings.kafka.password,
         &format!("{}-new-users", settings.kafka.consumer_group),
+        &settings.kafka.security_protocol,
+        &settings.kafka.sasl_mechanism,
     )?;
 
     consumer.subscribe(&[&settings.topics.new_users])?;
