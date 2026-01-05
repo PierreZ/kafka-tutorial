@@ -1,0 +1,12 @@
+# Classroom Simulator Configuration
+# Copy this file and update with your Kafka broker details
+
+brokers = "localhost:9092"
+username = "admin"
+password = "admin-secret"
+security_protocol = "SASL_PLAINTEXT"
+sasl_mechanism = "SCRAM-SHA-256"
+
+# Number of consumer instances per team
+# Set to 2+ to test consumer group scaling (Step 4)
+instances_per_team = 1

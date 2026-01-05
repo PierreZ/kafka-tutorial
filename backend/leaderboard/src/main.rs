@@ -9,6 +9,7 @@ pub const NUM_TEAMS: u32 = 15;
 
 use anyhow::Result;
 use clap::Parser;
+use std::fs::File;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -23,20 +24,25 @@ struct Args {
     /// Run in demo mode (no Kafka required)
     #[arg(long)]
     demo: bool,
+
+    /// Log file path (logs to file to avoid breaking TUI)
+    #[arg(long, default_value = "leaderboard.log")]
+    log_file: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
+    let args = Args::parse();
+
+    // Initialize tracing to file (stdout breaks TUI)
+    let log_file = File::create(&args.log_file)?;
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "info".into()),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_writer(log_file).with_ansi(false))
         .init();
-
-    let args = Args::parse();
 
     if args.demo {
         info!("Running in demo mode (no Kafka connection)");
