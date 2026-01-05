@@ -53,6 +53,13 @@ docker exec "$CONTAINER_NAME" rpk security user create leaderboard \
     --mechanism scram-sha-256 \
     $AUTH_FLAGS >/dev/null 2>&1 || echo "  (user may already exist)"
 
+# Create team-admin user
+echo "Creating user: team-admin"
+docker exec "$CONTAINER_NAME" rpk security user create team-admin \
+    -p "team-admin-secret" \
+    --mechanism scram-sha-256 \
+    $AUTH_FLAGS >/dev/null 2>&1 || echo "  (user may already exist)"
+
 # Create topics
 echo ""
 echo "=== Creating Topics ==="
@@ -148,8 +155,40 @@ docker exec "$CONTAINER_NAME" rpk acl create \
     --resource-pattern-type prefixed \
     $AUTH_FLAGS >/dev/null
 
+# Create team-admin ACLs (same as teams)
+echo "Setting up ACLs for team-admin..."
+
+# Read new_users topic
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:team-admin" \
+    --operation read --operation describe \
+    --topic new_users \
+    $AUTH_FLAGS >/dev/null
+
+# Write to actions topic
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:team-admin" \
+    --operation write --operation describe \
+    --topic actions \
+    $AUTH_FLAGS >/dev/null
+
+# Write to watchlist topic
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:team-admin" \
+    --operation write --operation describe \
+    --topic watchlist \
+    $AUTH_FLAGS >/dev/null
+
+# Consumer group access
+docker exec "$CONTAINER_NAME" rpk acl create \
+    --allow-principal "User:team-admin" \
+    --operation read --operation describe \
+    --group "team-admin" \
+    $AUTH_FLAGS >/dev/null
+
 echo ""
 echo "=== Setup Complete ==="
 echo "Topics: new_users, actions, watchlist (compacted), scorer_state (compacted)"
 echo "Teams: team-1 through team-15 (password: team-N-secret)"
+echo "Team admin: team-admin (password: team-admin-secret)"
 echo "Leaderboard user: leaderboard (password: leaderboard-secret)"
