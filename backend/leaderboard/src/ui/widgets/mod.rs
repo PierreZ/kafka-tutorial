@@ -1,15 +1,7 @@
-mod actions_table;
-mod help;
-mod json_viewer;
-mod leaderboard;
-mod metrics;
-mod team_detail;
-mod watchlist_table;
+//! UI widgets for the leaderboard TUI
 
-pub use actions_table::ActionsTableWidget;
-pub use help::HelpWidget;
-pub use json_viewer::JsonViewerWidget;
-pub use leaderboard::LeaderboardWidget;
-pub use metrics::MetricsWidget;
-pub use team_detail::TeamDetailWidget;
-pub use watchlist_table::WatchlistTableWidget;
+pub mod detail_panel;
+pub mod footer;
+pub mod header;
+pub mod help_overlay;
+pub mod leaderboard_table;

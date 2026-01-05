@@ -1,14 +1,6 @@
-pub mod app;
-pub mod event_buffer;
-mod widgets;
+//! UI module for the leaderboard TUI
 
-use crate::config::Settings;
-use anyhow::Result;
+mod app;
+pub mod widgets;
 
-pub async fn run(settings: Settings) -> Result<()> {
-    app::run(settings).await
-}
-
-pub async fn run_demo() -> Result<()> {
-    app::run_demo().await
-}
+pub use app::{run, run_demo};

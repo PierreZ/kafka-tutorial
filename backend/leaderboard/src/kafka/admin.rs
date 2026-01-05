@@ -1,8 +1,7 @@
 use crate::state::team::{ConsumerGroupStatus, GroupState};
-use anyhow::Result;
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use std::time::Duration;
-use tracing::{debug, warn};
+use tracing::warn;
 
 /// Map rdkafka group state string to our GroupState enum
 fn map_group_state(state: &str) -> GroupState {
@@ -97,64 +96,4 @@ fn fallback_empty_statuses() -> Vec<ConsumerGroupStatus> {
             lag: 0,
         })
         .collect()
-}
-
-/// Get the high watermark (latest offset) for a topic, summed across all partitions
-pub fn fetch_topic_high_watermark(
-    brokers: &str,
-    username: &str,
-    password: &str,
-    security_protocol: &str,
-    sasl_mechanism: &str,
-    topic: &str,
-) -> Result<i64> {
-    let consumer: BaseConsumer =
-        kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
-            .set("group.id", "leaderboard-watermark-check")
-            .create()?;
-
-    let timeout = Duration::from_secs(5);
-
-    // Get topic metadata to find partition count
-    let metadata = consumer.fetch_metadata(Some(topic), timeout)?;
-    let partition_count = metadata
-        .topics()
-        .iter()
-        .find(|t| t.name() == topic)
-        .map(|t| t.partitions().len())
-        .unwrap_or(1);
-
-    // Sum watermarks across all partitions
-    let mut total_high = 0i64;
-    for partition in 0..partition_count as i32 {
-        match consumer.fetch_watermarks(topic, partition, timeout) {
-            Ok((_low, high)) => {
-                debug!(
-                    "Topic {} partition {}: low={}, high={}",
-                    topic, partition, _low, high
-                );
-                total_high += high;
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to fetch watermarks for {} partition {}: {:?}",
-                    topic, partition, e
-                );
-            }
-        }
-    }
-
-    debug!(
-        "Topic {} total high watermark across {} partitions: {}",
-        topic, partition_count, total_high
-    );
-
-    Ok(total_high)
-}
-
-/// Calculate estimated lag for a team based on messages consumed vs topic high watermark
-pub fn estimate_team_lag(high_watermark: i64, messages_consumed: u64) -> i64 {
-    // Lag = total messages in topic - messages consumed by team
-    // This is accurate because messages_consumed tracks all messages the team processed
-    (high_watermark - messages_consumed as i64).max(0)
 }

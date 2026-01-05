@@ -23,21 +23,26 @@ pub enum AchievementType {
     Champion,          // First team to complete ALL achievements
 }
 
+/// Emoji for incomplete step
+pub const STEP_INCOMPLETE: &str = "⚪";
+
 impl AchievementType {
     /// Get the emoji for this achievement
     pub fn emoji(&self) -> &'static str {
         match self {
-            // Thematic Kafka emojis (single codepoints, render reliably)
-            AchievementType::Connected => "🔗", // Link/connection
-            AchievementType::FirstLoad => "📤", // Message sent
-            AchievementType::Scaled => "⚡",    // Power up / scaling
-            AchievementType::WatchlistDone => "👁", // Watching/monitoring
-            AchievementType::ParseError => "❌",
-            AchievementType::MissingFields => "❓",
+            // Step emojis - distinct visual for each tutorial step
+            AchievementType::Connected => "🔌",     // Plug = connection
+            AchievementType::FirstLoad => "📤",     // Outbox = producing
+            AchievementType::Scaled => "⚖️",        // Balance = scaling
+            AchievementType::WatchlistDone => "📋", // Clipboard = watchlist
+            // Error indicators
+            AchievementType::ParseError => "🔴",
+            AchievementType::MissingFields => "🟠",
+            // Bonus achievements
             AchievementType::PartitionExplorer => "🔬",
             AchievementType::HighThroughput => "📈",
             AchievementType::CleanStreak => "✨",
-            AchievementType::FirstBlood => "⚔",
+            AchievementType::FirstBlood => "⚔️",
             AchievementType::LagBuster => "🚀",
             AchievementType::Champion => "🏆",
         }
@@ -108,11 +113,6 @@ impl AchievementType {
         ]
     }
 
-    /// Get all error achievements
-    pub fn all_errors() -> [AchievementType; 2] {
-        [AchievementType::ParseError, AchievementType::MissingFields]
-    }
-
     /// Get all bonus achievements in display order
     pub fn all_bonus() -> [AchievementType; 6] {
         [
@@ -173,11 +173,6 @@ mod tests {
     #[test]
     fn test_all_steps_count() {
         assert_eq!(AchievementType::all_steps().len(), 4);
-    }
-
-    #[test]
-    fn test_all_errors_count() {
-        assert_eq!(AchievementType::all_errors().len(), 2);
     }
 
     #[test]

@@ -2,7 +2,7 @@ use super::achievements::AchievementType;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// State for a single team - simplified for step-based tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,8 +30,6 @@ pub struct TeamState {
     #[serde(skip)]
     pub last_watchlist_time: Option<Instant>, // When last watchlist message was produced
     #[serde(skip)]
-    pub recent_consumed: VecDeque<Instant>, // Rolling window for consumption rate
-    #[serde(skip)]
     pub recent_actions: VecDeque<Instant>, // Rolling window for production rate
 }
 
@@ -51,7 +49,6 @@ impl TeamState {
             session_start: None,
             last_action_time: None,
             last_watchlist_time: None,
-            recent_consumed: VecDeque::new(),
             recent_actions: VecDeque::new(),
         }
     }
@@ -120,64 +117,6 @@ impl TeamState {
         AchievementType::champion_requirements()
             .iter()
             .all(|a| self.achievements.contains(a))
-    }
-
-    /// Get consumption rate (messages per minute from new_users)
-    pub fn consumption_rate(&mut self) -> u64 {
-        let cutoff = Instant::now() - Duration::from_secs(60);
-        self.recent_consumed.retain(|&t| t >= cutoff);
-        self.recent_consumed.len() as u64
-    }
-
-    /// Get production rate (messages per minute to actions)
-    pub fn production_rate(&mut self) -> u64 {
-        let cutoff = Instant::now() - Duration::from_secs(60);
-        self.recent_actions.retain(|&t| t >= cutoff);
-        self.recent_actions.len() as u64
-    }
-
-    /// Get duration since last action (for "last activity" display)
-    pub fn last_activity_ago(&self) -> Option<Duration> {
-        self.last_action_time.map(|t| t.elapsed())
-    }
-
-    /// Format last activity as human-readable string
-    pub fn last_activity_display(&self) -> String {
-        match self.last_activity_ago() {
-            Some(d) => {
-                let secs = d.as_secs();
-                if secs < 60 {
-                    format!("{}s", secs)
-                } else if secs < 3600 {
-                    format!("{}m", secs / 60)
-                } else {
-                    format!("{}h", secs / 3600)
-                }
-            }
-            None => "-".to_string(),
-        }
-    }
-
-    /// Get duration since last watchlist message
-    pub fn last_watchlist_ago(&self) -> Option<Duration> {
-        self.last_watchlist_time.map(|t| t.elapsed())
-    }
-
-    /// Format last watchlist activity as human-readable string
-    pub fn last_watchlist_display(&self) -> String {
-        match self.last_watchlist_ago() {
-            Some(d) => {
-                let secs = d.as_secs();
-                if secs < 60 {
-                    format!("{}s", secs)
-                } else if secs < 3600 {
-                    format!("{}m", secs / 60)
-                } else {
-                    format!("{}h", secs / 3600)
-                }
-            }
-            None => "-".to_string(),
-        }
     }
 
     /// Format session duration as human-readable string
