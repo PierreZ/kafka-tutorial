@@ -6,18 +6,82 @@ Your task is to build a **watchlist** that tracks companies with suspicious acti
 
 ---
 
-## What You'll Learn
+## Understanding Message Keys
 
-In this step, you'll learn about:
-- **Message Keys**: How to produce messages with a key, not just a value
-- **Log Compaction**: A special topic configuration that keeps only the latest value per key
-- **Stateful Processing**: Maintaining counts in memory across messages
+Until now, you've only sent message **values**—the JSON payload. But Kafka messages actually have two parts: a **key** and a **value**.
+
+### Key vs Value
+
+| Component | Purpose | Example |
+|-----------|---------|---------|
+| **Key** | Identifies the entity | `"Acme Corp"` (company name) |
+| **Value** | Contains the data | `{"team": "team-1", "flag_count": 3}` |
+
+### Why Use Keys?
+
+Keys serve two important purposes:
+
+1. **Partition Routing**: Messages with the same key always go to the same partition. This guarantees ordering for that key.
+
+2. **Log Compaction**: When enabled, Kafka keeps only the **latest** value for each key—perfect for maintaining current state.
+
+```
+Without key:                      With key:
+Messages go to random partitions  Same key → same partition
+┌────┐ ┌────┐ ┌────┐              ┌────┐ ┌────┐ ┌────┐
+│ P0 │ │ P1 │ │ P2 │              │ P0 │ │ P1 │ │ P2 │
+├────┤ ├────┤ ├────┤              ├────┤ ├────┤ ├────┤
+│ A  │ │ B  │ │ A  │  ← scattered │ A  │ │ B  │ │ C  │
+│ C  │ │ A  │ │ B  │              │ A  │ │ B  │ │ C  │
+│ B  │ │ C  │ │ C  │              │ A  │ │ B  │ │ C  │
+└────┘ └────┘ └────┘              └────┘ └────┘ └────┘
+                                       ↑ All "A" messages together
+```
+
+---
+
+## Understanding Log Compaction
+
+### Regular Topics vs Compacted Topics
+
+Kafka topics can use different **retention policies**:
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| **Time-based** | Delete messages older than X hours/days | Event logs, audit trails |
+| **Size-based** | Delete oldest messages when topic exceeds X GB | Bounded storage |
+| **Compaction** | Keep only latest value per key | Current state, snapshots |
+
+### How Compaction Works
+
+In a compacted topic, Kafka periodically removes older records, keeping only the **most recent value for each unique key**:
+
+```
+BEFORE COMPACTION:                      AFTER COMPACTION:
+┌────────────────────────────────┐      ┌────────────────────────────────┐
+│ Key: "Acme Corp"  │ count: 1   │      │                                │
+│ Key: "Beta Inc"   │ count: 1   │      │                                │
+│ Key: "Acme Corp"  │ count: 2   │  ──► │ Key: "Beta Inc"   │ count: 2   │
+│ Key: "Beta Inc"   │ count: 2   │      │ Key: "Acme Corp"  │ count: 3   │
+│ Key: "Acme Corp"  │ count: 3   │      │                                │
+└────────────────────────────────┘      └────────────────────────────────┘
+        5 messages                              2 messages
+                                        (only latest per key!)
+```
+
+### Why Compaction is Powerful
+
+1. **State Recovery**: On restart, read the entire compacted topic to rebuild your state. Since only the latest values exist, this is fast.
+
+2. **Efficient Storage**: Old, superseded values are automatically cleaned up.
+
+3. **Always Current**: Any new consumer reading from the beginning gets the current state, not historical values.
 
 ---
 
 ## New Topic: `watchlist`
 
-The `watchlist` topic is special - it uses **log compaction**. Unlike regular topics that keep all messages, a compacted topic only retains the **latest message for each key**.
+The `watchlist` topic uses **log compaction**. This is perfect for our use case: tracking the *current* flag count per company, not the history of how it changed.
 
 ### Watchlist Record Schema
 
@@ -90,23 +154,9 @@ Ask the instructor to check if they can see your watchlist messages!
 
 ---
 
-## Why Compaction Works
+## Compaction in Action
 
-Consider what happens when you flag the same company multiple times:
-
-```
-Key: "Acme Corp" → Value: {"flag_count": 1}
-Key: "Acme Corp" → Value: {"flag_count": 2}
-Key: "Acme Corp" → Value: {"flag_count": 3}
-```
-
-After compaction runs, only the **latest** record for each key is kept:
-
-```
-Key: "Acme Corp" → Value: {"flag_count": 3}
-```
-
-This means on restart, you only need to read a small number of messages to fully restore your state!
+Now that you're producing to `watchlist`, observe what happens: each time you send an update for the same company, you're overwriting the previous value (from Kafka's compaction perspective). Even if you produce 100 updates for "Acme Corp", after compaction only the latest count remains—making state recovery fast and efficient.
 
 ---
 
