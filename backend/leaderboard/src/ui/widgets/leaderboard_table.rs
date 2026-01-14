@@ -112,7 +112,7 @@ pub fn render(
             let state = data.teams.get(team_name);
             let consumer_count = data.consumer_counts.get(team_name).copied().unwrap_or(0);
 
-            let (progress, lag, actions, watchlist, bonus, step_count) = match state {
+            let (progress, lag, actions, stats, bonus, step_count) = match state {
                 Some(s) => {
                     let progress = get_progress_emojis(s);
                     let connected = s.has_achievement(AchievementType::Connected);
@@ -122,13 +122,13 @@ pub fn render(
                     } else {
                         "-".to_string()
                     };
-                    let watchlist = if s.watchlist_count > 0 {
-                        format!("{}", s.watchlist_count)
+                    let stats = if s.stats_count > 0 {
+                        format!("{}", s.stats_count)
                     } else {
                         "-".to_string()
                     };
                     let bonus = get_bonus_emojis(s);
-                    (progress, lag, actions, watchlist, bonus, s.step_count())
+                    (progress, lag, actions, stats, bonus, s.step_count())
                 }
                 None => {
                     let progress = format!(
@@ -179,7 +179,7 @@ pub fn render(
                 Cell::from(format!("{:>2}", consumer_count)),
                 Cell::from(format!("{:>5}", lag)),
                 Cell::from(format!("{:>5}", actions)),
-                Cell::from(format!("{:>5}", watchlist)),
+                Cell::from(format!("{:>5}", stats)),
                 Cell::from(bonus),
             ])
             .style(style)
@@ -206,7 +206,7 @@ pub fn render(
         Cell::from("Inst"),
         Cell::from("  Lag"),
         Cell::from("Action"),
-        Cell::from(" Watch"),
+        Cell::from(" Stats"),
         Cell::from("Bonus"),
     ])
     .style(

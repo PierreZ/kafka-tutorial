@@ -37,7 +37,7 @@ fn default_sasl_mechanism() -> String {
 pub struct TopicSettings {
     pub new_users: String,
     pub actions: String,
-    pub watchlist: String,
+    pub team_stats: String,
     pub scorer_state: String,
 }
 

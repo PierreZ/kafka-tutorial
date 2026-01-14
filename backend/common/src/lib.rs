@@ -5,4 +5,4 @@ pub mod messages;
 pub mod topics;
 
 // Re-export commonly used types at crate root
-pub use messages::{Action, User, WatchlistEntry};
+pub use messages::{Action, TeamStats, User};

@@ -22,7 +22,7 @@ Each team will develop an application that follows a common pattern known as **E
 └──────────┘               │  (Python)   │              └─────────────┘
                            └─────────────┘
                                   │
-                                  │ watchlist (Step 5)
+                                  │ team_stats (Step 5)
                                   ▼
                            ┌─────────────┐
                            │  Compacted  │
@@ -78,12 +78,12 @@ Your instructor displays a real-time leaderboard that tracks your team's progres
 
 | Step | Achievement | Emoji | How to Unlock |
 |------|-------------|-------|---------------|
-| 1 | **Connected** | 1️⃣ | Consumer group becomes active |
-| 3 | **First Load** | 3️⃣ | Produce first valid action message |
-| 4 | **Scaled** | 4️⃣ | Have 2+ consumers in your group |
-| 5 | **Watchlist** | 5️⃣ | Produce first watchlist message |
+| 1 | **Connected** | 🔌 | Consumer group becomes active |
+| 3 | **First Load** | 📤 | Produce first valid action message |
+| 4 | **Scaled** | ⚖️ | Have 2+ consumers in your group |
+| 5 | **Stats Published** | 📊 | Produce first stats message with key |
 
-> Step 2 (Transform) has no achievement - your filter is verified when 3️⃣ unlocks.
+> Step 2 (Transform) has no achievement - your filter is verified when 📤 unlocks.
 
 ### Bonus Achievements
 
@@ -96,6 +96,8 @@ These unlock as you master Kafka concepts!
 | **Clean Streak** | ✨ | 50+ messages with 0 errors | Validation matters |
 | **First Blood** | ⚔️ | First team to connect | Quick setup wins! |
 | **Lag Buster** | 🚀 | Build up lag, then catch up | Understanding consumer lag |
+| **Key Master** | 🔑 | 25+ stats messages with correct key | Keys identify entities in compacted topics |
+| **Stats First** | 🎯 | First team to publish stats | Speed bonus for step 5 |
 | **Champion** | 🏆 | First team to complete ALL achievements | Ultimate goal! |
 
 ### Error Indicators
@@ -107,7 +109,7 @@ These unlock as you master Kafka concepts!
 
 ### Reading the Leaderboard
 
-- **Achievements column**: Shows 1️⃣ 3️⃣ 4️⃣ 5️⃣ for steps (⬜ for incomplete), then bonus emojis
+- **Achievements column**: Shows 🔌 📤 ⚖️ 📊 for steps (⚪ for incomplete), then bonus emojis
 - **Errors column**: Shows error counts (e.g., ❌x2)
 - **Team color**: Green (all 4 steps) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
 

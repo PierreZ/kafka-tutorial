@@ -137,6 +137,15 @@ pub fn render(frame: &mut Frame, area: Rect, data: &DetailPanelData) {
                     )
                 }
             }
+            AchievementType::KeyMaster => {
+                let current = data.team_state.correct_key_count;
+                let target = 25u64;
+                if has_it {
+                    format!("{}", current)
+                } else {
+                    format!("{}/{}", current, target)
+                }
+            }
             _ => {
                 if has_it {
                     "OK".to_string()
@@ -177,7 +186,8 @@ pub fn render(frame: &mut Frame, area: Rect, data: &DetailPanelData) {
 
     let stats = [
         ("Actions", format!("{}", data.team_state.action_count)),
-        ("Watchlist", format!("{}", data.team_state.watchlist_count)),
+        ("Stats", format!("{}", data.team_state.stats_count)),
+        ("Keys OK", format!("{}", data.team_state.correct_key_count)),
         ("Consumers", format!("{}", data.consumer_count)),
         ("Lag", format!("{}", data.team_state.current_lag)),
         (

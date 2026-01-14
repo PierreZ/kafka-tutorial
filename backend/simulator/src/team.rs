@@ -1,9 +1,9 @@
 use crate::filters::TeamFilter;
-use crate::watchlist::WatchlistState;
+use crate::stats::StatsState;
 use anyhow::Result;
 use futures::StreamExt;
-use kafka_common::topics::{ACTIONS_TOPIC, NEW_USERS_TOPIC, WATCHLIST_TOPIC};
-use kafka_common::{Action, User, WatchlistEntry};
+use kafka_common::topics::{ACTIONS_TOPIC, NEW_USERS_TOPIC, TEAM_STATS_TOPIC};
+use kafka_common::{Action, TeamStats, User};
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::Message;
@@ -17,7 +17,7 @@ pub struct TeamSimulator {
     consumer: StreamConsumer,
     producer: Arc<FutureProducer>,
     filter: Box<dyn TeamFilter>,
-    watchlist: Arc<WatchlistState>,
+    stats: Arc<StatsState>,
 }
 
 impl TeamSimulator {
@@ -27,7 +27,7 @@ impl TeamSimulator {
         consumer: StreamConsumer,
         producer: Arc<FutureProducer>,
         filter: Box<dyn TeamFilter>,
-        watchlist: Arc<WatchlistState>,
+        stats: Arc<StatsState>,
     ) -> Self {
         Self {
             team_number,
@@ -35,7 +35,7 @@ impl TeamSimulator {
             consumer,
             producer,
             filter,
-            watchlist,
+            stats,
         }
     }
 
@@ -79,6 +79,9 @@ impl TeamSimulator {
             }
         };
 
+        // Track every message processed
+        self.stats.increment_processed();
+
         // Apply filter
         if let Some(filter_match) = self.filter.matches(&user) {
             // Produce Action message
@@ -94,19 +97,18 @@ impl TeamSimulator {
 
             trace!("{}: Produced action for {}", team_name, user.email);
 
-            // Track for watchlist
-            if let Some(flag_count) = self.watchlist.increment(&user.company_name) {
-                let watchlist_entry =
-                    WatchlistEntry::new(team_name, &user.company_name, flag_count);
-                let watchlist_json = serde_json::to_string(&watchlist_entry).unwrap();
-                self.produce(WATCHLIST_TOPIC, &watchlist_json, &user.company_name)
-                    .await;
+            // Produce stats update (key = team name for compaction)
+            let (processed, flagged) = self.stats.increment_flagged();
+            let stats = TeamStats::new(team_name, processed, flagged);
+            let stats_json = serde_json::to_string(&stats).unwrap();
+            self.produce(TEAM_STATS_TOPIC, &stats_json, team_name).await;
 
-                debug!(
-                    "{}: Watchlist alert for {} (count: {})",
-                    team_name, user.company_name, flag_count
-                );
-            }
+            trace!(
+                "{}: Stats update (processed: {}, flagged: {})",
+                team_name,
+                processed,
+                flagged
+            );
         }
     }
 
@@ -114,7 +116,10 @@ impl TeamSimulator {
         let record = FutureRecord::to(topic).payload(value).key(key);
         debug!(
             "team-{}: Producing to {} (key={:?}, len={})",
-            self.team_number, topic, key, value.len()
+            self.team_number,
+            topic,
+            key,
+            value.len()
         );
         if let Err((e, _)) = self.producer.send(record, Duration::from_secs(0)).await {
             error!("Failed to produce to {}: {}", topic, e);

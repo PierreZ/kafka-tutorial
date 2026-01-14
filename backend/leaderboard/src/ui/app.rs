@@ -2,8 +2,11 @@
 
 use crate::config::Settings;
 use crate::kafka::{admin, consumer as kafka_consumer};
+use crate::state::team::TeamStatsSnapshot;
 use crate::state::{persistence, AchievementType, GroupState, TeamState};
-use crate::ui::widgets::{detail_panel, footer, header, help_overlay, leaderboard_table};
+use crate::ui::widgets::{
+    detail_panel, footer, header, help_overlay, leaderboard_table, stats_panel,
+};
 use crate::validation::{self, SimpleValidationResult};
 use crate::NUM_TEAMS;
 use anyhow::Result;
@@ -13,7 +16,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::StreamExt;
-use kafka_common::messages::WatchlistEntry;
+use kafka_common::messages::TeamStats;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -199,8 +202,8 @@ pub async fn run(settings: Settings) -> Result<()> {
     let state_clone = state.clone();
     let producer_clone = producer.clone();
     tokio::spawn(async move {
-        if let Err(e) = consume_watchlist(settings_clone, state_clone, producer_clone).await {
-            error!("Watchlist consumer error: {:?}", e);
+        if let Err(e) = consume_team_stats(settings_clone, state_clone, producer_clone).await {
+            error!("Team stats consumer error: {:?}", e);
         }
     });
 
@@ -238,13 +241,20 @@ pub async fn run_demo() -> Result<()> {
             team.unlock_achievement(AchievementType::Connected);
             team.unlock_achievement(AchievementType::FirstLoad);
             team.unlock_achievement(AchievementType::Scaled);
-            team.unlock_achievement(AchievementType::WatchlistDone);
+            team.unlock_achievement(AchievementType::StatsDone);
             team.unlock_achievement(AchievementType::FirstBlood);
             team.unlock_achievement(AchievementType::HighThroughput);
             team.unlock_achievement(AchievementType::CleanStreak);
+            team.unlock_achievement(AchievementType::KeyMaster);
+            team.unlock_achievement(AchievementType::StatsFirstBlood);
             team.action_count = 150;
-            team.watchlist_count = 5;
+            team.stats_count = 35;
+            team.correct_key_count = 35;
             team.current_lag = 0;
+            team.latest_stats = Some(TeamStatsSnapshot {
+                processed: 500,
+                flagged: 150,
+            });
         }
         app_state.consumer_counts.insert("team-1".to_string(), 3);
         app_state
@@ -258,7 +268,13 @@ pub async fn run_demo() -> Result<()> {
             team.unlock_achievement(AchievementType::Scaled);
             team.unlock_achievement(AchievementType::HighThroughput);
             team.action_count = 120;
+            team.stats_count = 18;
+            team.correct_key_count = 18;
             team.current_lag = 15;
+            team.latest_stats = Some(TeamStatsSnapshot {
+                processed: 320,
+                flagged: 120,
+            });
         }
         app_state.consumer_counts.insert("team-2".to_string(), 2);
         app_state
@@ -311,7 +327,7 @@ pub async fn run_demo() -> Result<()> {
         topics: crate::config::TopicSettings {
             new_users: "new_users".to_string(),
             actions: "actions".to_string(),
-            watchlist: "watchlist".to_string(),
+            team_stats: "team_stats".to_string(),
             scorer_state: "scorer_state".to_string(),
         },
         scoring: crate::config::ScoringSettings::default(),
@@ -436,11 +452,13 @@ fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, sett
     let show_detail = ui_state.show_detail_panel && !ui_state.fullscreen_mode;
 
     if show_detail {
+        // Three-panel layout: Table (50%) + Detail (25%) + Stats (25%)
         let content_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(60), // Table
-                Constraint::Percentage(40), // Detail
+                Constraint::Percentage(50), // Table
+                Constraint::Percentage(25), // Detail
+                Constraint::Percentage(25), // Stats
             ])
             .split(main_chunks[1]);
 
@@ -481,6 +499,13 @@ fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, sett
         } else {
             detail_panel::render_empty(frame, content_chunks[1]);
         }
+
+        // Stats panel - shows live stats from compacted topic
+        let stats_data = stats_panel::StatsPanelData {
+            teams: &app_state.teams,
+            sorted_teams: &ui_state.sorted_teams,
+        };
+        stats_panel::render(frame, content_chunks[2], &stats_data);
     } else {
         // Full width table
         let celebration_team = app_state.active_celebration().map(|c| c.team_name.as_str());
@@ -628,8 +653,8 @@ async fn consume_actions(
     Ok(())
 }
 
-/// Consume from watchlist topic
-async fn consume_watchlist(
+/// Consume from team_stats topic
+async fn consume_team_stats(
     settings: Settings,
     state: Arc<RwLock<AppState>>,
     producer: Arc<FutureProducer>,
@@ -640,38 +665,83 @@ async fn consume_watchlist(
         &settings.kafka.password,
         &settings.kafka.security_protocol,
         &settings.kafka.sasl_mechanism,
-        &format!("{}-watchlist", settings.kafka.consumer_group),
+        &format!("{}-team-stats", settings.kafka.consumer_group),
     )?;
 
-    consumer.subscribe(&[&settings.topics.watchlist])?;
+    consumer.subscribe(&[&settings.topics.team_stats])?;
     info!(
-        "Subscribed to watchlist topic: {}",
-        settings.topics.watchlist
+        "Subscribed to team_stats topic: {}",
+        settings.topics.team_stats
     );
 
     let mut stream = consumer.stream();
+
+    // Track if StatsFirstBlood has been awarded
+    let stats_first_blood_awarded = {
+        let app_state = state.read().await;
+        app_state
+            .teams
+            .values()
+            .any(|t| t.has_achievement(AchievementType::StatsFirstBlood))
+    };
+    let mut stats_first_blood_given = stats_first_blood_awarded;
 
     while let Some(result) = stream.next().await {
         match result {
             Ok(message) => {
                 if let Some(payload) = message.payload() {
-                    if let Ok(entry) = serde_json::from_slice::<WatchlistEntry>(payload) {
+                    if let Ok(stats) = serde_json::from_slice::<TeamStats>(payload) {
                         let scorer_topic = settings.topics.scorer_state.clone();
-                        let team_name = entry.team.clone();
+                        let team_name = stats.team.clone();
+
+                        // Check if key matches team name (for KeyMaster achievement)
+                        let key_correct = message
+                            .key()
+                            .map(|k| k == team_name.as_bytes())
+                            .unwrap_or(false);
+
+                        let snapshot = TeamStatsSnapshot {
+                            processed: stats.processed,
+                            flagged: stats.flagged,
+                        };
 
                         let mut app_state = state.write().await;
                         app_state.last_data_update = Some(Instant::now());
 
-                        let should_celebrate =
-                            if let Some(team) = app_state.teams.get_mut(&team_name) {
-                                team.watchlist_count += 1;
-                                team.last_watchlist_time = Some(Instant::now());
-                                team.unlock_achievement(AchievementType::WatchlistDone)
-                            } else {
-                                false
-                            };
+                        let mut celebrations = Vec::new();
+                        let mut should_persist = false;
 
-                        if should_celebrate {
+                        if let Some(team) = app_state.teams.get_mut(&team_name) {
+                            team.record_stats_message(snapshot, key_correct);
+
+                            // StatsDone - first valid stats message
+                            if team.unlock_achievement(AchievementType::StatsDone) {
+                                celebrations.push(AchievementType::StatsDone);
+                                should_persist = true;
+
+                                // StatsFirstBlood - first team to publish stats
+                                if !stats_first_blood_given {
+                                    team.unlock_achievement(AchievementType::StatsFirstBlood);
+                                    celebrations.push(AchievementType::StatsFirstBlood);
+                                    stats_first_blood_given = true;
+                                }
+                            }
+
+                            // KeyMaster - 25+ stats messages with correct key (cumulative)
+                            if team.correct_key_count >= 25
+                                && team.unlock_achievement(AchievementType::KeyMaster)
+                            {
+                                celebrations.push(AchievementType::KeyMaster);
+                                should_persist = true;
+                            }
+                        }
+
+                        // Add celebrations and persist if needed
+                        for achievement in &celebrations {
+                            app_state.add_celebration(team_name.clone(), *achievement);
+                        }
+
+                        if should_persist {
                             if let Some(team) = app_state.teams.get(&team_name) {
                                 let team_clone = team.clone();
                                 drop(app_state);
@@ -682,19 +752,13 @@ async fn consume_watchlist(
                                     &team_clone,
                                 )
                                 .await;
-
-                                let mut app_state = state.write().await;
-                                app_state.add_celebration(
-                                    team_name.clone(),
-                                    AchievementType::WatchlistDone,
-                                );
                             }
                         }
                     }
                 }
             }
             Err(e) => {
-                warn!("Error consuming watchlist: {:?}", e);
+                warn!("Error consuming team_stats: {:?}", e);
             }
         }
     }

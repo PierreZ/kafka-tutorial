@@ -86,21 +86,22 @@ impl Action {
     }
 }
 
-/// Watchlist entry produced by students to the `watchlist` topic.
-/// Contains flagged premium users grouped by company.
+/// Team statistics produced by students to the `team_stats` topic.
+/// Contains processing metrics for the team's fraud detection pipeline.
+/// The message key should be the team name for log compaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WatchlistEntry {
+pub struct TeamStats {
     pub team: String,
-    pub company: String,
-    pub flag_count: u32,
+    pub processed: u64,
+    pub flagged: u64,
 }
 
-impl WatchlistEntry {
-    pub fn new(team: &str, company: &str, flag_count: u32) -> Self {
+impl TeamStats {
+    pub fn new(team: &str, processed: u64, flagged: u64) -> Self {
         Self {
             team: team.to_string(),
-            company: company.to_string(),
-            flag_count,
+            processed,
+            flagged,
         }
     }
 }
@@ -118,10 +119,11 @@ mod tests {
     }
 
     #[test]
-    fn test_watchlist_serialization() {
-        let entry = WatchlistEntry::new("team-2", "Acme Corp", 5);
-        let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains("\"company\":\"Acme Corp\""));
+    fn test_team_stats_serialization() {
+        let stats = TeamStats::new("team-2", 150, 23);
+        let json = serde_json::to_string(&stats).unwrap();
+        assert!(json.contains("\"processed\":150"));
+        assert!(json.contains("\"flagged\":23"));
     }
 
     #[cfg(feature = "fake-data")]

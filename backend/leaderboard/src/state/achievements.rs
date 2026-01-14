@@ -5,10 +5,10 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AchievementType {
     // Step-based progress achievements
-    Connected,     // Step 1: Consumer group active
-    FirstLoad,     // Step 3: First message to actions topic
-    Scaled,        // Step 4: 2+ consumers in group
-    WatchlistDone, // Step 5: Message to watchlist topic
+    Connected, // Step 1: Consumer group active
+    FirstLoad, // Step 3: First message to actions topic
+    Scaled,    // Step 4: 2+ consumers in group
+    StatsDone, // Step 5: Message to team_stats topic
 
     // Error achievements (educational feedback)
     ParseError,    // Invalid JSON
@@ -20,6 +20,8 @@ pub enum AchievementType {
     CleanStreak,       // 50+ messages with 0 errors
     FirstBlood,        // First team to get Connected
     LagBuster,         // Build up 100+ lag, then consume it all
+    KeyMaster,         // 25+ stats messages with correct key
+    StatsFirstBlood,   // First team to publish stats
     Champion,          // First team to complete ALL achievements
 }
 
@@ -34,7 +36,7 @@ impl AchievementType {
             AchievementType::Connected => "🔌", // Plug = connection
             AchievementType::FirstLoad => "📤", // Outbox = producing
             AchievementType::Scaled => "⚖️",    // Balance = scaling
-            AchievementType::WatchlistDone => "📋", // Clipboard = watchlist
+            AchievementType::StatsDone => "📊", // Chart = stats
             // Error indicators
             AchievementType::ParseError => "🔴",
             AchievementType::MissingFields => "🟠",
@@ -44,6 +46,8 @@ impl AchievementType {
             AchievementType::CleanStreak => "✨",
             AchievementType::FirstBlood => "⚔️",
             AchievementType::LagBuster => "🚀",
+            AchievementType::KeyMaster => "🔑",
+            AchievementType::StatsFirstBlood => "🎯",
             AchievementType::Champion => "🏆",
         }
     }
@@ -54,7 +58,7 @@ impl AchievementType {
             AchievementType::Connected => "Connected",
             AchievementType::FirstLoad => "First Load",
             AchievementType::Scaled => "Scaled",
-            AchievementType::WatchlistDone => "Watchlist",
+            AchievementType::StatsDone => "Stats Published",
             AchievementType::ParseError => "Parse Error",
             AchievementType::MissingFields => "Missing Fields",
             AchievementType::PartitionExplorer => "Partition Explorer",
@@ -62,6 +66,8 @@ impl AchievementType {
             AchievementType::CleanStreak => "Clean Streak",
             AchievementType::FirstBlood => "First Blood",
             AchievementType::LagBuster => "Lag Buster",
+            AchievementType::KeyMaster => "Key Master",
+            AchievementType::StatsFirstBlood => "Stats First",
             AchievementType::Champion => "Champion",
         }
     }
@@ -72,7 +78,7 @@ impl AchievementType {
             AchievementType::Connected => "Start your consumer and join the consumer group",
             AchievementType::FirstLoad => "Successfully produce your first valid action message",
             AchievementType::Scaled => "Run 2+ consumers in your group (teaches parallelism)",
-            AchievementType::WatchlistDone => "Produce a message to the watchlist topic",
+            AchievementType::StatsDone => "Produce a message to the team_stats topic",
             AchievementType::ParseError => "Produced invalid JSON (fix your serialization!)",
             AchievementType::MissingFields => "Produced JSON with missing required fields",
             AchievementType::PartitionExplorer => "Run 3+ consumers (teaches partition limits)",
@@ -80,6 +86,8 @@ impl AchievementType {
             AchievementType::CleanStreak => "Produce 50+ consecutive messages with zero errors",
             AchievementType::FirstBlood => "First team to get the Connected achievement",
             AchievementType::LagBuster => "Build up 100+ lag, then consume it all",
+            AchievementType::KeyMaster => "Produce 25+ stats messages with correct key",
+            AchievementType::StatsFirstBlood => "First team to publish stats",
             AchievementType::Champion => "First team to earn all other achievements",
         }
     }
@@ -91,7 +99,7 @@ impl AchievementType {
             AchievementType::Connected
                 | AchievementType::FirstLoad
                 | AchievementType::Scaled
-                | AchievementType::WatchlistDone
+                | AchievementType::StatsDone
         )
     }
 
@@ -109,34 +117,38 @@ impl AchievementType {
             AchievementType::Connected,
             AchievementType::FirstLoad,
             AchievementType::Scaled,
-            AchievementType::WatchlistDone,
+            AchievementType::StatsDone,
         ]
     }
 
     /// Get all bonus achievements in display order
-    pub fn all_bonus() -> [AchievementType; 6] {
+    pub fn all_bonus() -> [AchievementType; 8] {
         [
             AchievementType::PartitionExplorer,
             AchievementType::HighThroughput,
             AchievementType::CleanStreak,
             AchievementType::FirstBlood,
             AchievementType::LagBuster,
+            AchievementType::KeyMaster,
+            AchievementType::StatsFirstBlood,
             AchievementType::Champion,
         ]
     }
 
     /// Get all achievements required for Champion (all except Champion itself)
-    pub fn champion_requirements() -> [AchievementType; 9] {
+    pub fn champion_requirements() -> [AchievementType; 11] {
         [
             AchievementType::Connected,
             AchievementType::FirstLoad,
             AchievementType::Scaled,
-            AchievementType::WatchlistDone,
+            AchievementType::StatsDone,
             AchievementType::PartitionExplorer,
             AchievementType::HighThroughput,
             AchievementType::CleanStreak,
             AchievementType::FirstBlood,
             AchievementType::LagBuster,
+            AchievementType::KeyMaster,
+            AchievementType::StatsFirstBlood,
         ]
     }
 }
@@ -156,7 +168,7 @@ mod tests {
         assert!(AchievementType::Connected.is_step());
         assert!(AchievementType::FirstLoad.is_step());
         assert!(AchievementType::Scaled.is_step());
-        assert!(AchievementType::WatchlistDone.is_step());
+        assert!(AchievementType::StatsDone.is_step());
         assert!(!AchievementType::ParseError.is_step());
         assert!(!AchievementType::MissingFields.is_step());
         assert!(!AchievementType::PartitionExplorer.is_step());
@@ -177,13 +189,13 @@ mod tests {
 
     #[test]
     fn test_all_bonus_count() {
-        assert_eq!(AchievementType::all_bonus().len(), 6);
+        assert_eq!(AchievementType::all_bonus().len(), 8);
     }
 
     #[test]
     fn test_champion_requirements() {
         let reqs = AchievementType::champion_requirements();
-        assert_eq!(reqs.len(), 9);
+        assert_eq!(reqs.len(), 11);
         assert!(!reqs.contains(&AchievementType::Champion));
     }
 }

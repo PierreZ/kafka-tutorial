@@ -1,12 +1,12 @@
 mod config;
 mod filters;
+mod stats;
 mod team;
-mod watchlist;
 
 use crate::config::Settings;
 use crate::filters::get_filter;
+use crate::stats::StatsState;
 use crate::team::TeamSimulator;
-use crate::watchlist::WatchlistState;
 use anyhow::Result;
 use clap::Parser;
 use rdkafka::consumer::StreamConsumer;
@@ -18,7 +18,6 @@ use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const NUM_TEAMS: u32 = 15;
-const WATCHLIST_THRESHOLD: u32 = 3;
 
 #[derive(Parser, Debug)]
 #[command(name = "simulator")]
@@ -60,7 +59,11 @@ async fn main() -> Result<()> {
                 tracing_subscriber::EnvFilter::try_from_default_env()
                     .unwrap_or_else(|_| "info".into()),
             )
-            .with(tracing_subscriber::fmt::layer().with_writer(file).with_ansi(false))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(file)
+                    .with_ansi(false),
+            )
             .init();
     } else {
         // Default: log to stdout
@@ -115,14 +118,14 @@ async fn run_simulator(settings: Settings) -> Result<()> {
     let mut join_set = JoinSet::new();
 
     for team_number in 1..=NUM_TEAMS {
-        // Shared watchlist state per team (across all instances)
-        let watchlist = Arc::new(WatchlistState::new(WATCHLIST_THRESHOLD));
+        // Shared stats state per team (across all instances)
+        let stats = Arc::new(StatsState::new());
 
         for instance_id in 0..settings.instances_per_team {
             let consumer = create_consumer(&settings, team_number)?;
             let filter = get_filter(team_number);
             let producer_clone = Arc::clone(&producer);
-            let watchlist_clone = Arc::clone(&watchlist);
+            let stats_clone = Arc::clone(&stats);
 
             let simulator = TeamSimulator::new(
                 team_number,
@@ -130,12 +133,15 @@ async fn run_simulator(settings: Settings) -> Result<()> {
                 consumer,
                 producer_clone,
                 filter,
-                watchlist_clone,
+                stats_clone,
             );
 
             join_set.spawn(async move {
                 if let Err(e) = simulator.run().await {
-                    error!("Team {} instance {} failed: {}", team_number, instance_id, e);
+                    error!(
+                        "Team {} instance {} failed: {}",
+                        team_number, instance_id, e
+                    );
                 }
             });
         }

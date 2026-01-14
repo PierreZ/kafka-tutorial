@@ -74,11 +74,11 @@ docker exec "$CONTAINER_NAME" rpk topic create actions \
     $AUTH_FLAGS 2>/dev/null || echo "Topic actions may already exist"
 
 # Create log-compacted topics
-docker exec "$CONTAINER_NAME" rpk topic create watchlist \
+docker exec "$CONTAINER_NAME" rpk topic create team_stats \
     --partitions 2 \
     --replicas 1 \
     --topic-config cleanup.policy=compact \
-    $AUTH_FLAGS 2>/dev/null || echo "Topic watchlist may already exist"
+    $AUTH_FLAGS 2>/dev/null || echo "Topic team_stats may already exist"
 
 docker exec "$CONTAINER_NAME" rpk topic create scorer_state \
     --partitions 1 \
@@ -107,11 +107,11 @@ for team_num in $(seq 1 15); do
         --topic actions \
         $AUTH_FLAGS >/dev/null
 
-    # Write to watchlist topic (step 5)
+    # Write to team_stats topic (step 5)
     docker exec "$CONTAINER_NAME" rpk acl create \
         --allow-principal "User:$team" \
         --operation write --operation describe \
-        --topic watchlist \
+        --topic team_stats \
         $AUTH_FLAGS >/dev/null
 
     # Consumer group access
@@ -145,7 +145,7 @@ docker exec "$CONTAINER_NAME" rpk acl create \
 docker exec "$CONTAINER_NAME" rpk acl create \
     --allow-principal "User:leaderboard" \
     --operation read --operation describe \
-    --topic watchlist \
+    --topic team_stats \
     $AUTH_FLAGS >/dev/null
 
 docker exec "$CONTAINER_NAME" rpk acl create \
@@ -180,11 +180,11 @@ docker exec "$CONTAINER_NAME" rpk acl create \
     --topic actions \
     $AUTH_FLAGS >/dev/null
 
-# Write to watchlist topic
+# Write to team_stats topic
 docker exec "$CONTAINER_NAME" rpk acl create \
     --allow-principal "User:team-admin" \
     --operation write --operation describe \
-    --topic watchlist \
+    --topic team_stats \
     $AUTH_FLAGS >/dev/null
 
 # Consumer group access
@@ -196,7 +196,7 @@ docker exec "$CONTAINER_NAME" rpk acl create \
 
 echo ""
 echo "=== Setup Complete ==="
-echo "Topics: new_users, actions, watchlist (compacted), scorer_state (compacted)"
+echo "Topics: new_users, actions, team_stats (compacted), scorer_state (compacted)"
 echo "Teams: team-1 through team-15 (password: team-N-secret)"
 echo "Team admin: team-admin (password: team-admin-secret)"
 echo "Leaderboard user: leaderboard (password: leaderboard-secret)"

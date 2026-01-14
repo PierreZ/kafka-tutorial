@@ -4,13 +4,20 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 
+/// Snapshot of team stats from the compacted topic
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TeamStatsSnapshot {
+    pub processed: u64,
+    pub flagged: u64,
+}
+
 /// State for a single team - simplified for step-based tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TeamState {
     pub team_name: String,
     pub achievements: HashSet<AchievementType>,
-    pub action_count: u64,    // Valid messages to actions topic
-    pub watchlist_count: u64, // Messages to watchlist topic
+    pub action_count: u64, // Valid messages to actions topic
+    pub stats_count: u64,  // Messages to team_stats topic
     pub error_counts: HashMap<AchievementType, u32>, // ParseError and MissingFields counts
     #[serde(default)]
     pub max_lag_seen: i64, // Peak lag ever observed (for LagBuster)
@@ -21,6 +28,8 @@ pub struct TeamState {
     #[serde(default)]
     pub clean_streak_count: u64, // Consecutive valid messages without errors (for CleanStreak)
     #[serde(default)]
+    pub correct_key_count: u64, // Stats messages with correct key (for KeyMaster)
+    #[serde(default)]
     pub achievement_timestamps: HashMap<AchievementType, DateTime<Utc>>, // When each achievement was unlocked
     #[serde(default)]
     pub session_start: Option<DateTime<Utc>>, // When this team's session started
@@ -28,7 +37,9 @@ pub struct TeamState {
     #[serde(skip)]
     pub last_action_time: Option<Instant>, // When last action was produced
     #[serde(skip)]
-    pub last_watchlist_time: Option<Instant>, // When last watchlist message was produced
+    pub last_stats_time: Option<Instant>, // When last stats message was produced
+    #[serde(skip)]
+    pub latest_stats: Option<TeamStatsSnapshot>, // Latest stats from compacted topic
     #[serde(skip)]
     pub recent_actions: VecDeque<Instant>, // Rolling window for production rate
 }
@@ -39,17 +50,29 @@ impl TeamState {
             team_name,
             achievements: HashSet::new(),
             action_count: 0,
-            watchlist_count: 0,
+            stats_count: 0,
             error_counts: HashMap::new(),
             max_lag_seen: 0,
             current_lag: 0,
             messages_consumed: 0,
             clean_streak_count: 0,
+            correct_key_count: 0,
             achievement_timestamps: HashMap::new(),
             session_start: None,
             last_action_time: None,
-            last_watchlist_time: None,
+            last_stats_time: None,
+            latest_stats: None,
             recent_actions: VecDeque::new(),
+        }
+    }
+
+    /// Record a stats message, tracking correct key usage
+    pub fn record_stats_message(&mut self, stats: TeamStatsSnapshot, key_correct: bool) {
+        self.stats_count += 1;
+        self.last_stats_time = Some(Instant::now());
+        self.latest_stats = Some(stats);
+        if key_correct {
+            self.correct_key_count += 1;
         }
     }
 
