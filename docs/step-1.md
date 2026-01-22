@@ -31,7 +31,7 @@ The main topic is named "new_users". Here's an example of the JSON pushed:
 ## TODOs
 
 ### Step 1: Read Kafka Messages
-With the provided GitPod setup, the boilerplate code is already in place for you to begin. 
+With your environment set up (see Step 0), the boilerplate code in `main.py` is ready for you to begin. 
 
 1. Replace the placeholders `BOOTSTRAP_SERVERS`, `TEAM_NAME`, `SASL_USERNAME`, and `SASL_PASSWORD` with the appropriate values in the code.
 2. Run the code. If everything is configured correctly, you should see the Kafka messages being displayed in the output.

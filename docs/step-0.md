@@ -36,9 +36,27 @@ These applications can be written in any language, but for this tutorial, suppor
 - Python
 - Rust
 
-You can use the online Python environment, accessible through the link below, to get started with the tutorial:
+## Environment Setup
 
-[![Open in GitPod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/PierreZ/kafka-tutorial)
+Choose one of the following options to set up your development environment:
+
+### Option A: Virtualenv (for experienced users)
+
+```bash
+git clone https://github.com/PierreZ/kafka-tutorial.git
+cd kafka-tutorial
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Option B: Dev Container (recommended)
+
+1. Install [Docker](https://www.docker.com/products/docker-desktop) and [VS Code](https://code.visualstudio.com/)
+2. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. Clone the repository and open it in VS Code
+4. Click "Reopen in Container" when prompted (or use the command palette: `Dev Containers: Reopen in Container`)
+5. Wait for the container to build - your environment is ready!
 
 ---
 
