@@ -80,18 +80,9 @@ For more details, refer to the [KafkaProducer guide](https://kafka-python.readth
 
 | Leaderboard Shows | Meaning |
 |-------------------|---------|
-| 3️⃣ in Progress | Success! Your filter + producer are working |
-| ❌ in Errors | Invalid JSON - check `json.dumps()` |
-| ❓ in Errors | Missing fields - need `customer`, `type`, `reason`, `team` |
+| 📤 in Progress | Success! Your filter + producer are working |
 
 Ask the instructor to confirm they can see your message!
-
-### Bonus Achievements
-
-| Achievement | Unlock | Tip |
-|-------------|--------|-----|
-| ✨ Clean Streak | 50+ messages, 0 errors | Validate JSON before sending |
-| 📈 High Throughput | 100+ valid actions | Keep producing! |
 
 ## Next step
 

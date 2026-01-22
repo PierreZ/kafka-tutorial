@@ -1,5 +1,4 @@
 use kafka_common::Action;
-use serde::Deserialize;
 
 /// Simple validation result - no cross-consumption validation
 #[derive(Debug, Clone)]
@@ -46,19 +45,6 @@ pub fn validate_action_simple(payload: &[u8]) -> SimpleValidationResult {
     SimpleValidationResult::Valid { team: action.team }
 }
 
-/// Extract team name from payload if possible (for error reporting)
-pub fn extract_team_from_payload(payload: &[u8]) -> Option<String> {
-    #[derive(Deserialize)]
-    struct TeamOnly {
-        team: Option<String>,
-    }
-
-    serde_json::from_slice::<TeamOnly>(payload)
-        .ok()
-        .and_then(|t| t.team)
-        .filter(|t| !t.is_empty())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,15 +85,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_extract_team() {
-        let payload = br#"{"team":"team-5","other":"data"}"#;
-        assert_eq!(
-            extract_team_from_payload(payload),
-            Some("team-5".to_string())
-        );
-
-        let payload = b"invalid";
-        assert_eq!(extract_team_from_payload(payload), None);
-    }
 }

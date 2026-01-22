@@ -18,17 +18,8 @@ pub struct TeamState {
     pub achievements: HashSet<AchievementType>,
     pub action_count: u64, // Valid messages to actions topic
     pub stats_count: u64,  // Messages to team_stats topic
-    pub error_counts: HashMap<AchievementType, u32>, // ParseError and MissingFields counts
-    #[serde(default)]
-    pub max_lag_seen: i64, // Peak lag ever observed (for LagBuster)
     #[serde(default)]
     pub current_lag: i64, // Current consumer lag
-    #[serde(default)]
-    pub messages_consumed: u64, // Total messages consumed from new_users topic (for accurate lag)
-    #[serde(default)]
-    pub clean_streak_count: u64, // Consecutive valid messages without errors (for CleanStreak)
-    #[serde(default)]
-    pub correct_key_count: u64, // Stats messages with correct key (for KeyMaster)
     #[serde(default)]
     pub achievement_timestamps: HashMap<AchievementType, DateTime<Utc>>, // When each achievement was unlocked
     #[serde(default)]
@@ -51,12 +42,7 @@ impl TeamState {
             achievements: HashSet::new(),
             action_count: 0,
             stats_count: 0,
-            error_counts: HashMap::new(),
-            max_lag_seen: 0,
             current_lag: 0,
-            messages_consumed: 0,
-            clean_streak_count: 0,
-            correct_key_count: 0,
             achievement_timestamps: HashMap::new(),
             session_start: None,
             last_action_time: None,
@@ -66,14 +52,11 @@ impl TeamState {
         }
     }
 
-    /// Record a stats message, tracking correct key usage
-    pub fn record_stats_message(&mut self, stats: TeamStatsSnapshot, key_correct: bool) {
+    /// Record a stats message
+    pub fn record_stats_message(&mut self, stats: TeamStatsSnapshot) {
         self.stats_count += 1;
         self.last_stats_time = Some(Instant::now());
         self.latest_stats = Some(stats);
-        if key_correct {
-            self.correct_key_count += 1;
-        }
     }
 
     /// Unlock an achievement, returns true if newly unlocked
@@ -95,51 +78,14 @@ impl TeamState {
         self.achievements.contains(&achievement)
     }
 
-    /// Record an error (increments count and marks as encountered)
-    /// Also resets the clean streak counter
-    pub fn record_error(&mut self, error: AchievementType) {
-        if error.is_error() {
-            let count = self.error_counts.entry(error).or_insert(0);
-            *count = count.saturating_add(1);
-            self.achievements.insert(error);
-            self.clean_streak_count = 0; // Reset streak on any error
-        }
-    }
-
-    /// Increment clean streak counter (called on valid message)
-    pub fn increment_clean_streak(&mut self) {
-        self.clean_streak_count = self.clean_streak_count.saturating_add(1);
-    }
-
-    /// Get error count for a specific error type
-    pub fn get_error_count(&self, error: AchievementType) -> u32 {
-        *self.error_counts.get(&error).unwrap_or(&0)
-    }
-
     /// Count of step achievements earned (for sorting)
     pub fn step_count(&self) -> usize {
         self.achievements.iter().filter(|a| a.is_step()).count()
     }
 
-    /// Update lag tracking and check for LagBuster achievement
+    /// Update lag tracking
     pub fn update_lag(&mut self, new_lag: i64) {
         self.current_lag = new_lag;
-        if new_lag > self.max_lag_seen {
-            self.max_lag_seen = new_lag;
-        }
-    }
-
-    /// Check if team qualifies for LagBuster (had threshold+ lag, now caught up)
-    /// Uses <= 5 threshold instead of == 0 to handle timing fluctuations
-    pub fn qualifies_for_lag_buster(&self, threshold: i64) -> bool {
-        self.max_lag_seen >= threshold && self.current_lag <= 5
-    }
-
-    /// Check if team has all achievements required for Champion
-    pub fn has_all_champion_requirements(&self) -> bool {
-        AchievementType::champion_requirements()
-            .iter()
-            .all(|a| self.achievements.contains(a))
     }
 
     /// Format session duration as human-readable string
@@ -213,124 +159,25 @@ mod tests {
     }
 
     #[test]
-    fn test_record_error() {
-        let mut state = TeamState::new("team-1".to_string());
-
-        state.record_error(AchievementType::ParseError);
-        state.record_error(AchievementType::ParseError);
-
-        assert_eq!(state.get_error_count(AchievementType::ParseError), 2);
-        assert!(state.has_achievement(AchievementType::ParseError));
-    }
-
-    #[test]
     fn test_step_count() {
         let mut state = TeamState::new("team-1".to_string());
         assert_eq!(state.step_count(), 0);
 
         state.unlock_achievement(AchievementType::Connected);
         state.unlock_achievement(AchievementType::FirstLoad);
-        state.unlock_achievement(AchievementType::ParseError); // Error, not a step
 
         assert_eq!(state.step_count(), 2);
     }
 
     #[test]
-    fn test_lag_buster_qualification() {
+    fn test_update_lag() {
         let mut state = TeamState::new("team-1".to_string());
-        let threshold = 100; // Default threshold
-        assert!(!state.qualifies_for_lag_buster(threshold));
+        assert_eq!(state.current_lag, 0);
 
-        // Build up lag
         state.update_lag(50);
-        assert!(!state.qualifies_for_lag_buster(threshold)); // Not enough lag
+        assert_eq!(state.current_lag, 50);
 
         state.update_lag(150);
-        assert!(!state.qualifies_for_lag_buster(threshold)); // Still has lag
-
-        // Catch up (threshold is <= 5)
-        state.update_lag(5);
-        assert!(state.qualifies_for_lag_buster(threshold)); // Qualifies at threshold
-
-        state.update_lag(0);
-        assert!(state.qualifies_for_lag_buster(threshold)); // Also qualifies at 0
-
-        state.update_lag(6);
-        assert!(!state.qualifies_for_lag_buster(threshold)); // Above threshold, doesn't qualify
-    }
-
-    #[test]
-    fn test_champion_requirements() {
-        let mut state = TeamState::new("team-1".to_string());
-        assert!(!state.has_all_champion_requirements());
-
-        // Unlock all required achievements
-        for achievement in AchievementType::champion_requirements() {
-            state.unlock_achievement(achievement);
-        }
-
-        assert!(state.has_all_champion_requirements());
-    }
-
-    #[test]
-    fn test_clean_streak_increment() {
-        let mut state = TeamState::new("team-1".to_string());
-        assert_eq!(state.clean_streak_count, 0);
-
-        state.increment_clean_streak();
-        assert_eq!(state.clean_streak_count, 1);
-
-        state.increment_clean_streak();
-        state.increment_clean_streak();
-        assert_eq!(state.clean_streak_count, 3);
-    }
-
-    #[test]
-    fn test_clean_streak_reset_on_error() {
-        let mut state = TeamState::new("team-1".to_string());
-
-        // Build up a streak
-        for _ in 0..10 {
-            state.increment_clean_streak();
-        }
-        assert_eq!(state.clean_streak_count, 10);
-
-        // Error should reset the streak
-        state.record_error(AchievementType::ParseError);
-        assert_eq!(state.clean_streak_count, 0);
-    }
-
-    #[test]
-    fn test_clean_streak_recovery_after_error() {
-        let mut state = TeamState::new("team-1".to_string());
-
-        // Build streak, error, rebuild
-        for _ in 0..25 {
-            state.increment_clean_streak();
-        }
-        state.record_error(AchievementType::MissingFields);
-        assert_eq!(state.clean_streak_count, 0);
-
-        // Can rebuild streak after error
-        for _ in 0..50 {
-            state.increment_clean_streak();
-        }
-        assert_eq!(state.clean_streak_count, 50);
-    }
-
-    #[test]
-    fn test_clean_streak_threshold() {
-        let mut state = TeamState::new("team-1".to_string());
-
-        // Simulate 49 valid messages
-        for _ in 0..49 {
-            state.increment_clean_streak();
-        }
-        assert_eq!(state.clean_streak_count, 49);
-
-        // 50th message should qualify for achievement threshold
-        state.increment_clean_streak();
-        assert_eq!(state.clean_streak_count, 50);
-        assert!(state.clean_streak_count >= 50);
+        assert_eq!(state.current_lag, 150);
     }
 }

@@ -61,17 +61,6 @@ fn get_progress_emojis(state: &TeamState) -> String {
     progress
 }
 
-/// Get bonus achievements emoji string
-fn get_bonus_emojis(state: &TeamState) -> String {
-    let mut bonus = String::new();
-    for achievement in AchievementType::all_bonus() {
-        if state.has_achievement(achievement) {
-            bonus.push_str(achievement.emoji());
-        }
-    }
-    bonus
-}
-
 /// Get row color based on step progress
 fn get_row_color(step_count: usize) -> Color {
     match step_count {
@@ -112,7 +101,7 @@ pub fn render(
             let state = data.teams.get(team_name);
             let consumer_count = data.consumer_counts.get(team_name).copied().unwrap_or(0);
 
-            let (progress, lag, actions, stats, bonus, step_count) = match state {
+            let (progress, lag, actions, stats, step_count) = match state {
                 Some(s) => {
                     let progress = get_progress_emojis(s);
                     let connected = s.has_achievement(AchievementType::Connected);
@@ -127,8 +116,7 @@ pub fn render(
                     } else {
                         "-".to_string()
                     };
-                    let bonus = get_bonus_emojis(s);
-                    (progress, lag, actions, stats, bonus, s.step_count())
+                    (progress, lag, actions, stats, s.step_count())
                 }
                 None => {
                     let progress = format!(
@@ -140,7 +128,6 @@ pub fn render(
                         "-".to_string(),
                         "-".to_string(),
                         "-".to_string(),
-                        String::new(),
                         0,
                     )
                 }
@@ -180,7 +167,6 @@ pub fn render(
                 Cell::from(format!("{:>5}", lag)),
                 Cell::from(format!("{:>5}", actions)),
                 Cell::from(format!("{:>5}", stats)),
-                Cell::from(bonus),
             ])
             .style(style)
         })
@@ -188,14 +174,13 @@ pub fn render(
 
     // Column widths - optimized for compact display
     let widths = [
-        Constraint::Length(3), // Rank
-        Constraint::Length(8), // Team
-        Constraint::Length(9), // Progress (4 emojis)
-        Constraint::Length(4), // Instances
-        Constraint::Length(6), // Lag
-        Constraint::Length(6), // Actions
-        Constraint::Length(6), // Watchlist
-        Constraint::Min(6),    // Bonus (flexible)
+        Constraint::Length(3),  // Rank
+        Constraint::Length(8),  // Team
+        Constraint::Length(9),  // Progress (4 emojis)
+        Constraint::Length(4),  // Instances
+        Constraint::Length(6),  // Lag
+        Constraint::Length(6),  // Actions
+        Constraint::Min(6),     // Stats (flexible)
     ];
 
     // Header
@@ -207,7 +192,6 @@ pub fn render(
         Cell::from("  Lag"),
         Cell::from("Action"),
         Cell::from(" Stats"),
-        Cell::from("Bonus"),
     ])
     .style(
         Style::default()

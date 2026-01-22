@@ -164,19 +164,9 @@ producer.send('team_stats',
 | Leaderboard Shows | Meaning |
 |-------------------|---------|
 | 📊 in Progress | Success! Stats message received |
-| 1️⃣ 3️⃣ 4️⃣ 📊 all visible | Tutorial complete! |
+| 🔌 📤 ⚖️ 📊 all visible | Tutorial complete! |
 
 The instructor's dashboard shows your live stats in a dedicated panel!
-
----
-
-## Achievements
-
-| Achievement | Emoji | How to Unlock |
-|-------------|-------|---------------|
-| **Stats Published** | 📊 | Produce first valid stats message |
-| **Key Master** | 🔑 | Produce 25+ stats messages with correct key |
-| **Stats First** | 🎯 | First team to publish stats |
 
 ---
 
@@ -217,14 +207,6 @@ restore_consumer.close()
 ```
 
 This is an advanced challenge - ask your instructor for guidance if you get stuck!
-
----
-
-## Go for Champion!
-
-Completed all 4 step achievements? Now unlock the bonus achievements to become the **first Champion**!
-
-See [Step 0](/kafka-tutorial/docs/step-0.html#bonus-achievements) for the full list.
 
 ---
 

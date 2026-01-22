@@ -46,19 +46,12 @@ pub fn render(frame: &mut Frame, area: Rect, data: &StatsPanelData) {
                 .fg(Color::DarkGray)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(
-            "🔑",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        ),
     ]));
 
     // Team rows
     for team_name in data.sorted_teams {
         if let Some(team) = data.teams.get(team_name) {
-            let (proc_str, flag_str, rate_str, key_str) = if let Some(ref stats) = team.latest_stats
-            {
+            let (proc_str, flag_str, rate_str) = if let Some(ref stats) = team.latest_stats {
                 let rate = if stats.processed > 0 {
                     (stats.flagged as f64 / stats.processed as f64 * 100.0) as u32
                 } else {
@@ -68,14 +61,12 @@ pub fn render(frame: &mut Frame, area: Rect, data: &StatsPanelData) {
                     format!("{:>5}", stats.processed),
                     format!("{:>5}", stats.flagged),
                     format!("{:>3}%", rate),
-                    format!("{:>3}", team.correct_key_count),
                 )
             } else {
                 (
                     "    -".to_string(),
                     "    -".to_string(),
                     "   -".to_string(),
-                    "  -".to_string(),
                 )
             };
 
@@ -95,7 +86,6 @@ pub fn render(frame: &mut Frame, area: Rect, data: &StatsPanelData) {
                 Span::styled(format!("{} ", proc_str), style),
                 Span::styled(format!("{} ", flag_str), style),
                 Span::styled(format!("{} ", rate_str), style),
-                Span::styled(key_str, style),
             ]));
         }
     }

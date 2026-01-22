@@ -236,20 +236,14 @@ pub async fn run_demo() -> Result<()> {
     {
         let mut app_state = state.write().await;
 
-        // team-1: All achievements
+        // team-1: All step achievements
         if let Some(team) = app_state.teams.get_mut("team-1") {
             team.unlock_achievement(AchievementType::Connected);
             team.unlock_achievement(AchievementType::FirstLoad);
             team.unlock_achievement(AchievementType::Scaled);
             team.unlock_achievement(AchievementType::StatsDone);
-            team.unlock_achievement(AchievementType::FirstBlood);
-            team.unlock_achievement(AchievementType::HighThroughput);
-            team.unlock_achievement(AchievementType::CleanStreak);
-            team.unlock_achievement(AchievementType::KeyMaster);
-            team.unlock_achievement(AchievementType::StatsFirstBlood);
             team.action_count = 150;
             team.stats_count = 35;
-            team.correct_key_count = 35;
             team.current_lag = 0;
             team.latest_stats = Some(TeamStatsSnapshot {
                 processed: 500,
@@ -266,10 +260,8 @@ pub async fn run_demo() -> Result<()> {
             team.unlock_achievement(AchievementType::Connected);
             team.unlock_achievement(AchievementType::FirstLoad);
             team.unlock_achievement(AchievementType::Scaled);
-            team.unlock_achievement(AchievementType::HighThroughput);
             team.action_count = 120;
             team.stats_count = 18;
-            team.correct_key_count = 18;
             team.current_lag = 15;
             team.latest_stats = Some(TeamStatsSnapshot {
                 processed: 320,
@@ -281,13 +273,10 @@ pub async fn run_demo() -> Result<()> {
             .group_states
             .insert("team-2".to_string(), GroupState::Active);
 
-        // team-3: 2 steps with errors
+        // team-3: 2 steps
         if let Some(team) = app_state.teams.get_mut("team-3") {
             team.unlock_achievement(AchievementType::Connected);
             team.unlock_achievement(AchievementType::FirstLoad);
-            team.record_error(AchievementType::ParseError);
-            team.record_error(AchievementType::ParseError);
-            team.record_error(AchievementType::ParseError);
             team.action_count = 45;
             team.current_lag = 89;
         }
@@ -426,7 +415,7 @@ async fn run_app(
 }
 
 /// Draw the UI
-fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, settings: &Settings) {
+fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, _settings: &Settings) {
     let area = frame.area();
 
     // Main layout: header (2 lines), content (flex), footer (1 line)
@@ -490,7 +479,6 @@ fn draw_ui(frame: &mut Frame, app_state: &AppState, ui_state: &mut UiState, sett
                 let detail_data = detail_panel::DetailPanelData {
                     team_state,
                     consumer_count,
-                    achievement_settings: &settings.achievements,
                 };
                 detail_panel::render(frame, content_chunks[1], &detail_data);
             } else {
@@ -569,32 +557,19 @@ async fn consume_actions(
 
                     match validation_result {
                         SimpleValidationResult::Valid { team: team_name } => {
-                            // Clone values we need before mutable borrow
-                            let thresholds = (
-                                settings.achievements.high_throughput_threshold,
-                                settings.achievements.clean_streak_threshold,
-                            );
                             let scorer_topic = settings.topics.scorer_state.clone();
 
                             if let Some(team) = app_state.teams.get_mut(&team_name) {
                                 team.action_count += 1;
                                 team.last_action_time = Some(Instant::now());
                                 team.recent_actions.push_back(Instant::now());
-                                team.increment_clean_streak();
 
-                                let action_count = team.action_count;
-                                let clean_streak = team.clean_streak_count;
-
-                                // Check achievements
+                                // Check FirstLoad achievement
                                 let first_load =
                                     team.unlock_achievement(AchievementType::FirstLoad);
-                                let high_throughput = action_count >= thresholds.0
-                                    && team.unlock_achievement(AchievementType::HighThroughput);
-                                let clean_streak_ach = clean_streak >= thresholds.1
-                                    && team.unlock_achievement(AchievementType::CleanStreak);
 
                                 // Persist if needed
-                                if first_load || high_throughput || clean_streak_ach {
+                                if first_load {
                                     let team_clone = team.clone();
                                     drop(app_state);
 
@@ -606,40 +581,18 @@ async fn consume_actions(
                                     .await;
 
                                     let mut app_state = state.write().await;
-                                    if first_load {
-                                        app_state.add_celebration(
-                                            team_name.clone(),
-                                            AchievementType::FirstLoad,
-                                        );
-                                    }
-                                    if high_throughput {
-                                        app_state.add_celebration(
-                                            team_name.clone(),
-                                            AchievementType::HighThroughput,
-                                        );
-                                    }
-                                    if clean_streak_ach {
-                                        app_state.add_celebration(
-                                            team_name.clone(),
-                                            AchievementType::CleanStreak,
-                                        );
-                                    }
+                                    app_state.add_celebration(
+                                        team_name.clone(),
+                                        AchievementType::FirstLoad,
+                                    );
                                 }
                             }
                         }
                         SimpleValidationResult::InvalidJson => {
-                            // Try to extract team name from raw JSON
-                            if let Some(team_name) = validation::extract_team_from_payload(payload)
-                            {
-                                if let Some(team) = app_state.teams.get_mut(&team_name) {
-                                    team.record_error(AchievementType::ParseError);
-                                }
-                            }
+                            // Just log, no error tracking
                         }
-                        SimpleValidationResult::MissingFields { team: team_name } => {
-                            if let Some(team) = app_state.teams.get_mut(&team_name) {
-                                team.record_error(AchievementType::MissingFields);
-                            }
+                        SimpleValidationResult::MissingFields { team: _team_name } => {
+                            // Just log, no error tracking
                         }
                     }
                 }
@@ -676,16 +629,6 @@ async fn consume_team_stats(
 
     let mut stream = consumer.stream();
 
-    // Track if StatsFirstBlood has been awarded
-    let stats_first_blood_awarded = {
-        let app_state = state.read().await;
-        app_state
-            .teams
-            .values()
-            .any(|t| t.has_achievement(AchievementType::StatsFirstBlood))
-    };
-    let mut stats_first_blood_given = stats_first_blood_awarded;
-
     while let Some(result) = stream.next().await {
         match result {
             Ok(message) => {
@@ -693,12 +636,6 @@ async fn consume_team_stats(
                     if let Ok(stats) = serde_json::from_slice::<TeamStats>(payload) {
                         let scorer_topic = settings.topics.scorer_state.clone();
                         let team_name = stats.team.clone();
-
-                        // Check if key matches team name (for KeyMaster achievement)
-                        let key_correct = message
-                            .key()
-                            .map(|k| k == team_name.as_bytes())
-                            .unwrap_or(false);
 
                         let snapshot = TeamStatsSnapshot {
                             processed: stats.processed,
@@ -712,26 +649,11 @@ async fn consume_team_stats(
                         let mut should_persist = false;
 
                         if let Some(team) = app_state.teams.get_mut(&team_name) {
-                            team.record_stats_message(snapshot, key_correct);
+                            team.record_stats_message(snapshot);
 
                             // StatsDone - first valid stats message
                             if team.unlock_achievement(AchievementType::StatsDone) {
                                 celebrations.push(AchievementType::StatsDone);
-                                should_persist = true;
-
-                                // StatsFirstBlood - first team to publish stats
-                                if !stats_first_blood_given {
-                                    team.unlock_achievement(AchievementType::StatsFirstBlood);
-                                    celebrations.push(AchievementType::StatsFirstBlood);
-                                    stats_first_blood_given = true;
-                                }
-                            }
-
-                            // KeyMaster - 25+ stats messages with correct key (cumulative)
-                            if team.correct_key_count >= 25
-                                && team.unlock_achievement(AchievementType::KeyMaster)
-                            {
-                                celebrations.push(AchievementType::KeyMaster);
                                 should_persist = true;
                             }
                         }
@@ -782,17 +704,6 @@ async fn monitor_consumer_groups(
     )
     .await;
 
-    // Check first blood status
-    let first_blood_awarded = {
-        let app_state = state.read().await;
-        app_state
-            .teams
-            .values()
-            .any(|t| t.has_achievement(AchievementType::FirstBlood))
-    };
-
-    let mut first_blood_given = first_blood_awarded;
-
     for status in statuses {
         let team_name = status.team_name.clone();
 
@@ -829,13 +740,6 @@ async fn monitor_consumer_groups(
             {
                 celebrations.push(AchievementType::Connected);
                 should_persist = true;
-
-                // Check First Blood
-                if !first_blood_given {
-                    team.unlock_achievement(AchievementType::FirstBlood);
-                    celebrations.push(AchievementType::FirstBlood);
-                    first_blood_given = true;
-                }
             }
 
             // Check Scaled achievement
@@ -844,27 +748,6 @@ async fn monitor_consumer_groups(
             {
                 celebrations.push(AchievementType::Scaled);
                 should_persist = true;
-            }
-
-            // Check Partition Explorer achievement
-            if status.members >= settings.achievements.partition_explorer_members
-                && team.unlock_achievement(AchievementType::PartitionExplorer)
-            {
-                celebrations.push(AchievementType::PartitionExplorer);
-            }
-
-            // Check Lag Buster achievement
-            if team.qualifies_for_lag_buster(settings.achievements.lag_buster_threshold)
-                && team.unlock_achievement(AchievementType::LagBuster)
-            {
-                celebrations.push(AchievementType::LagBuster);
-            }
-
-            // Check Champion achievement
-            if team.has_all_champion_requirements()
-                && team.unlock_achievement(AchievementType::Champion)
-            {
-                celebrations.push(AchievementType::Champion);
             }
         }
 

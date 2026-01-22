@@ -85,32 +85,9 @@ Your instructor displays a real-time leaderboard that tracks your team's progres
 
 > Step 2 (Transform) has no achievement - your filter is verified when 📤 unlocks.
 
-### Bonus Achievements
-
-These unlock as you master Kafka concepts!
-
-| Achievement | Emoji | How to Unlock | Kafka Lesson |
-|-------------|-------|---------------|--------------|
-| **Partition Explorer** | 🔬 | Have 3+ consumers in your group | Partitions limit parallelism—extra consumers sit idle! |
-| **High Throughput** | 📈 | Produce 100+ valid actions | Sustained message production |
-| **Clean Streak** | ✨ | 50+ messages with 0 errors | Validation matters |
-| **First Blood** | ⚔️ | First team to connect | Quick setup wins! |
-| **Lag Buster** | 🚀 | Build up lag, then catch up | Understanding consumer lag |
-| **Key Master** | 🔑 | 25+ stats messages with correct key | Keys identify entities in compacted topics |
-| **Stats First** | 🎯 | First team to publish stats | Speed bonus for step 5 |
-| **Champion** | 🏆 | First team to complete ALL achievements | Ultimate goal! |
-
-### Error Indicators
-
-| Emoji | Error | What Went Wrong |
-|-------|-------|-----------------|
-| ❌ | **Parse Error** | Invalid JSON format |
-| ❓ | **Missing Fields** | Missing `customer`, `type`, `reason`, or `team` |
-
 ### Reading the Leaderboard
 
-- **Achievements column**: Shows 🔌 📤 ⚖️ 📊 for steps (⚪ for incomplete), then bonus emojis
-- **Errors column**: Shows error counts (e.g., ❌x2)
+- **Progress column**: Shows 🔌 📤 ⚖️ 📊 for steps (⚪ for incomplete)
 - **Team color**: Green (all 4 steps) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
 
 ---

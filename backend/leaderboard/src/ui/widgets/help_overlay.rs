@@ -85,27 +85,6 @@ pub fn render(frame: &mut Frame) {
 
     lines.push(Line::from(""));
 
-    // Bonus achievements
-    lines.push(Line::from(vec![Span::styled(
-        "Bonus Achievements",
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    )]));
-
-    for bonus in AchievementType::all_bonus() {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(
-                format!("{} {:<15}", bonus.emoji(), bonus.name()),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(bonus.description(), Style::default().fg(Color::DarkGray)),
-        ]));
-    }
-
-    lines.push(Line::from(""));
-
     // Status icons legend
     lines.push(Line::from(vec![Span::styled(
         "Status Icons",
@@ -115,9 +94,8 @@ pub fn render(frame: &mut Frame) {
     )]));
 
     let status_icons = [
-        ("OK", "Connected and no errors", Color::Green),
+        ("OK", "Connected and active", Color::Green),
         ("Disconnected", "Consumer group empty", Color::Yellow),
-        ("Error", "Has parse/field errors", Color::Red),
         ("Pending", "Not yet connected", Color::DarkGray),
     ];
 
