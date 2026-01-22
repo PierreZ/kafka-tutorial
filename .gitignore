@@ -4,4 +4,7 @@ main-solution.py
 # Nix/direnv
 .direnv/
 
+# Python virtualenv
+.venv/
+
 target/
