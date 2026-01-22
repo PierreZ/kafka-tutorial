@@ -22,7 +22,7 @@ Each team will develop an application that follows a common pattern known as **E
 └──────────┘               │  (Python)   │              └─────────────┘
                            └─────────────┘
                                   │
-                                  │ watchlist (Step 5)
+                                  │ team_stats (Step 5)
                                   ▼
                            ┌─────────────┐
                            │  Compacted  │
@@ -36,9 +36,27 @@ These applications can be written in any language, but for this tutorial, suppor
 - Python
 - Rust
 
-You can use the online Python environment, accessible through the link below, to get started with the tutorial:
+## Environment Setup
 
-[![Open in GitPod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/PierreZ/kafka-tutorial)
+Choose one of the following options to set up your development environment:
+
+### Option A: Virtualenv (for experienced users)
+
+```bash
+git clone https://github.com/PierreZ/kafka-tutorial.git
+cd kafka-tutorial
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Option B: Dev Container (recommended)
+
+1. Install [Docker](https://www.docker.com/products/docker-desktop) and [VS Code](https://code.visualstudio.com/)
+2. Install the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+3. Clone the repository and open it in VS Code
+4. Click "Reopen in Container" when prompted (or use the command palette: `Dev Containers: Reopen in Container`)
+5. Wait for the container to build - your environment is ready!
 
 ---
 
@@ -72,46 +90,23 @@ This helps you understand expected match rates - if your filter never matches, d
 
 ## Leaderboard & Achievements
 
-Your instructor has a real-time leaderboard that tracks your team's progress! Earn points by correctly processing messages and unlock achievements along the way.
+Your instructor displays a real-time leaderboard that tracks your team's progress!
 
-### How Scoring Works
+### Step Achievements
 
-Every action your team produces to the `actions` topic is validated:
-- ✅ Valid JSON with all required fields (`customer`, `type`, `reason`, `team`)
-- ✅ User exists in the `new_users` topic
-- ✅ User matches your team's filter criteria
-- ✅ Correct `type` and `reason` values
-- ✅ No duplicate actions
+| Step | Achievement | Emoji | How to Unlock |
+|------|-------------|-------|---------------|
+| 1 | **Connected** | 🔌 | Consumer group becomes active |
+| 3 | **First Load** | 📤 | Produce first valid action message |
+| 4 | **Scaled** | ⚖️ | Have 2+ consumers in your group |
+| 5 | **Stats Published** | 📊 | Produce first stats message with key |
 
-Each valid action earns **10 points**.
+> Step 2 (Transform) has no achievement - your filter is verified when 📤 unlocks.
 
-### Progress Achievements
+### Reading the Leaderboard
 
-| Badge | Name | How to Unlock | Points |
-|-------|------|---------------|--------|
-| 🐣 | **First Steps** | Produce your first valid action | 10 |
-| 🔥 | **Fifty** | Produce 50 valid actions | 100 |
-| 💯 | **Century** | Produce 100 valid actions | 200 |
-| ⚡ | **Streak 10** | 10 consecutive correct actions | 50 |
-
-### Mistake Achievements (0 points - educational)
-
-These help you identify what went wrong:
-
-| Badge | Name | What Went Wrong |
-|-------|------|-----------------|
-| ❌ | **Parse Error** | Invalid JSON format |
-| 👻 | **Ghost User** | Customer doesn't exist in `new_users` |
-| 2️⃣ | **Duplicate** | Already flagged this customer |
-| ❓ | **Missing Fields** | Missing required fields |
-| 🙈 | **False Positive** | User doesn't match your filter |
-
-### Infrastructure Achievements
-
-| Badge | Name | How to Unlock | Points |
-|-------|------|---------------|--------|
-| 🔌 | **Connected** | Consumer group is active | 25 |
-| 👥 | **Scaled** | 2+ consumers in your group | 50 |
+- **Progress column**: Shows 🔌 📤 ⚖️ 📊 for steps (⚪ for incomplete)
+- **Team color**: Green (all 4 steps) → Yellow (3) → Cyan (2) → Blue (1) → Gray (none)
 
 ---
 

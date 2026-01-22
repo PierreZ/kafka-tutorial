@@ -1,0 +1,16 @@
+[package]
+name = "producer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+rdkafka.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+config.workspace = true
+
+kafka-common = { path = "../common", features = ["fake-data"] }
+structopt = "0.3"

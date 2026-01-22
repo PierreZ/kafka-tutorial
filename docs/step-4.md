@@ -1,15 +1,87 @@
 # Step 4: Scale-up
 
-In this step, we’ll explore how to scale your application by running multiple instances of your program. Kafka’s **Consumer Groups** enable load balancing and fault tolerance by distributing the processing of messages across multiple consumers within the same group.
+In this step, we'll explore how to scale your application by running multiple instances of your program. Kafka's **Consumer Groups** enable load balancing and fault tolerance by distributing the processing of messages across multiple consumers within the same group.
 
-## What is a Consumer Group?
+## Understanding Consumer Groups
 
-A **Consumer Group** is a way to coordinate multiple consumer instances to work together. All consumers in the same group share the responsibility for processing partitions of a topic. Here’s how it works:
-- Each partition in a topic is assigned to only one consumer in a group at a time. 
-- If new consumers join the group, Kafka rebalances the partitions among all the active consumers.
-- When a consumer leaves the group, its partitions are reassigned to the remaining consumers.
+### What is a Consumer Group?
 
-This approach ensures scalability and fault tolerance for your application.
+A **Consumer Group** is a set of consumers that work together to consume messages from a topic. The key insight is that **each partition is assigned to exactly one consumer within a group**—no two consumers in the same group ever read from the same partition.
+
+Think of it like a team splitting up work: if you have 3 partitions and 2 team members, one person handles 2 partitions while the other handles 1.
+
+### The group.id
+
+Your consumer's `group_id` (e.g., `"team-1"`) identifies which Consumer Group it belongs to. All consumers with the same `group_id` are part of the same group and share the workload.
+
+```
+                    Topic: new_users (3 partitions)
+                    ┌───────┐ ┌───────┐ ┌───────┐
+                    │  P0   │ │  P1   │ │  P2   │
+                    └───┬───┘ └───┬───┘ └───┬───┘
+                        │        │        │
+    ┌───────────────────┼────────┼────────┼───────────────────┐
+    │                   ▼        ▼        ▼                   │
+    │  Consumer Group: team-1                                 │
+    │                                                         │
+    │  With 1 consumer:                                       │
+    │  ┌─────────────────────────────────────┐               │
+    │  │     Consumer A (your laptop)        │               │
+    │  │        reads P0, P1, P2             │               │
+    │  └─────────────────────────────────────┘               │
+    │                                                         │
+    │  With 2 consumers (after colleague joins):              │
+    │  ┌─────────────────┐  ┌─────────────────┐              │
+    │  │   Consumer A    │  │   Consumer B    │              │
+    │  │   reads P0, P1  │  │    reads P2     │              │
+    │  └─────────────────┘  └─────────────────┘              │
+    └─────────────────────────────────────────────────────────┘
+```
+
+### What is Rebalancing?
+
+**Rebalancing** is the process where Kafka redistributes partitions among consumers. It happens when:
+- A new consumer joins the group
+- A consumer leaves the group (crashes, shuts down, or times out)
+- New partitions are added to the topic
+
+During a rebalance:
+1. All consumers in the group temporarily stop reading
+2. Kafka reassigns partitions based on the number of active consumers
+3. Each consumer receives its new partition assignment
+4. Consumers resume reading from where they left off
+
+This typically takes a few seconds—you might notice a brief pause in message processing.
+
+### Offset Tracking: Remembering Where You Left Off
+
+Kafka tracks the **committed offset** for each partition within each Consumer Group. This is how Kafka knows where each group left off, even if consumers restart.
+
+```
+Consumer Group: team-1
+┌─────────────┬──────────────────┐
+│  Partition  │ Committed Offset │
+├─────────────┼──────────────────┤
+│     P0      │       142        │  ← Last processed message
+│     P1      │       98         │
+│     P2      │       201        │
+└─────────────┴──────────────────┘
+```
+
+When a consumer (re)starts, it asks: "What was the last offset I committed for each partition?" and resumes from there.
+
+### Key Insight: Max Parallelism = Partition Count
+
+You **cannot have more active consumers than partitions**. If you have 3 partitions and 4 consumers, one consumer will sit idle with nothing to read.
+
+| Consumers | Partition Assignment | Notes |
+|-----------|---------------------|-------|
+| 1 | A: P0, P1, P2 | One consumer handles everything |
+| 2 | A: P0, P1  B: P2 | Work is split |
+| 3 | A: P0  B: P1  C: P2 | Maximum parallelism |
+| 4 | A: P0  B: P1  C: P2  D: (idle) | Extra consumer is wasted! |
+
+This is why partition count is an important decision when creating topics.
 
 ---
 
@@ -49,13 +121,15 @@ Ask the instructor to increase the message production rate to simulate higher tr
 
 ---
 
-## Achievements
+## Check Your Work
 
-Complete this step to unlock:
-- **Scaled** (50 pts): Have 2 or more consumers active in your team's consumer group
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| ⚖️ in Progress | Success! 2+ consumers active |
+| Only 🔌 📤 | Only one consumer running |
 
 ---
 
-Congratulations, you've learned how to distribute and scale your Kafka-based program using Consumer Groups! 🎉
+Congratulations, you've learned how to distribute and scale your Kafka-based program using Consumer Groups!
 
 You can now head to [step 5](/kafka-tutorial/docs/step-5.html) to learn about stateful processing!

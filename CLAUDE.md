@@ -17,9 +17,9 @@ This is a 3-hour educational Apache Kafka tutorial designed for engineering stud
 
 Two main components:
 - **Python consumer/producer** (`main.py`): Template code for tutorial participants using `kafka-python`
-- **Rust producer** (`producer/`): Generates fake user data and publishes to Kafka using `rdkafka`
+- **Rust producer** (`backend/producer/`): Generates fake user data and publishes to Kafka using `rdkafka`
 
-Both connect via SASL_PLAINTEXT with PLAIN mechanism. Local development uses Docker (see `local-dev/`).
+Both connect via SASL_PLAINTEXT with SCRAM-SHA-256 mechanism. Local development uses Docker (see `local-dev/`).
 
 ## Build and Run Commands
 
@@ -27,13 +27,13 @@ Both connect via SASL_PLAINTEXT with PLAIN mechanism. Local development uses Doc
 
 ```bash
 # Build
-cargo build --release --manifest-path producer/Cargo.toml
+cargo build --release --manifest-path backend/producer/Cargo.toml
 
 # Run (requires config.toml with broker credentials)
-./producer/target/release/producer -c producer/config.toml
+./backend/producer/target/release/producer -c backend/producer/config.toml
 
 # Run tests
-cargo test --manifest-path producer/Cargo.toml
+cargo test --manifest-path backend/producer/Cargo.toml
 ```
 
 ### Python Tutorial
@@ -61,7 +61,7 @@ python main.py
 
 ## Configuration
 
-Producer config (`producer/config.toml`):
+Producer config (`backend/producer/config.toml`):
 - `interval_millis`: Message send interval
 - `topic`: Target Kafka topic (default: "new_users")
 - `brokers`: Kafka bootstrap servers

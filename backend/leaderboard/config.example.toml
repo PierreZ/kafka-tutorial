@@ -1,0 +1,23 @@
+[kafka]
+brokers = "localhost:9092"
+username = "leaderboard"
+password = "leaderboard-secret"
+consumer_group = "leaderboard"
+security_protocol = "SASL_PLAINTEXT"
+sasl_mechanism = "SCRAM-SHA-256"
+
+[topics]
+new_users = "new_users"
+actions = "actions"
+team_stats = "team_stats"
+scorer_state = "scorer_state"
+
+[scoring]
+user_cache_max_size = 10000
+
+[achievements]
+high_throughput_threshold = 100
+clean_streak_threshold = 50
+lag_buster_threshold = 100
+partition_explorer_members = 3
+scaled_members = 2

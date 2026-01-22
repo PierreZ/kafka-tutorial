@@ -1,130 +1,210 @@
-# Step 5: Stateful Processing (Watchlist)
+# Step 5: Keys and Log Compaction (Team Stats)
 
-Your fraud detection system from the previous steps is working well! But your mentor has a new observation: sometimes multiple flagged users come from the **same company**. When a company has 3 or more flagged users, it's worth investigating further.
+Your fraud detection pipeline is working! Now your manager wants visibility into each team's progress. You'll build a **real-time dashboard** that publishes your processing statistics.
 
-Your task is to build a **watchlist** that tracks companies with suspicious activity.
-
----
-
-## What You'll Learn
-
-In this step, you'll learn about:
-- **Message Keys**: How to produce messages with a key, not just a value
-- **Log Compaction**: A special topic configuration that keeps only the latest value per key
-- **Stateful Processing**: Maintaining counts in memory across messages
+Since teams may restart their consumers, the dashboard should always show the **latest** stats—not historical values. This is a perfect use case for **log compaction** with **message keys**.
 
 ---
 
-## New Topic: `watchlist`
+## Understanding Message Keys
 
-The `watchlist` topic is special - it uses **log compaction**. Unlike regular topics that keep all messages, a compacted topic only retains the **latest message for each key**.
+Until now, you've only sent message **values**—the JSON payload. But Kafka messages actually have two parts: a **key** and a **value**.
 
-### Watchlist Record Schema
+### Key vs Value
 
-When you detect a flagged user, you'll produce a record like this:
+| Component | Purpose | Example |
+|-----------|---------|---------|
+| **Key** | Identifies the entity | `"team-1"` (your team name) |
+| **Value** | Contains the data | `{"team": "team-1", "processed": 150, "flagged": 23}` |
+
+### Why Use Keys?
+
+Keys serve two important purposes:
+
+1. **Partition Routing**: Messages with the same key always go to the same partition. This guarantees ordering for that key.
+
+2. **Log Compaction**: When enabled, Kafka keeps only the **latest** value for each key—perfect for maintaining current state.
+
+```
+Without key:                      With key:
+Messages go to random partitions  Same key → same partition
+┌────┐ ┌────┐ ┌────┐              ┌────┐ ┌────┐ ┌────┐
+│ P0 │ │ P1 │ │ P2 │              │ P0 │ │ P1 │ │ P2 │
+├────┤ ├────┤ ├────┤              ├────┤ ├────┤ ├────┤
+│ A  │ │ B  │ │ A  │  ← scattered │ A  │ │ B  │ │ C  │
+│ C  │ │ A  │ │ B  │              │ A  │ │ B  │ │ C  │
+│ B  │ │ C  │ │ C  │              │ A  │ │ B  │ │ C  │
+└────┘ └────┘ └────┘              └────┘ └────┘ └────┘
+                                       ↑ All "A" messages together
+```
+
+---
+
+## Understanding Log Compaction
+
+### Regular Topics vs Compacted Topics
+
+Kafka topics can use different **retention policies**:
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| **Time-based** | Delete messages older than X hours/days | Event logs, audit trails |
+| **Size-based** | Delete oldest messages when topic exceeds X GB | Bounded storage |
+| **Compaction** | Keep only latest value per key | Current state, dashboards |
+
+### How Compaction Works
+
+In a compacted topic, Kafka periodically removes older records, keeping only the **most recent value for each unique key**:
+
+```
+BEFORE COMPACTION:                      AFTER COMPACTION:
+┌────────────────────────────────┐      ┌────────────────────────────────┐
+│ Key: "team-1"  │ flagged: 10   │      │                                │
+│ Key: "team-2"  │ flagged: 5    │      │                                │
+│ Key: "team-1"  │ flagged: 15   │  ──► │ Key: "team-2"  │ flagged: 8    │
+│ Key: "team-2"  │ flagged: 8    │      │ Key: "team-1"  │ flagged: 23   │
+│ Key: "team-1"  │ flagged: 23   │      │                                │
+└────────────────────────────────┘      └────────────────────────────────┘
+        5 messages                              2 messages
+                                        (only latest per key!)
+```
+
+### Why Compaction is Powerful
+
+1. **State Recovery**: On restart, read the entire compacted topic to rebuild your state. Since only the latest values exist, this is fast.
+
+2. **Efficient Storage**: Old, superseded values are automatically cleaned up.
+
+3. **Always Current**: Any new consumer reading from the beginning gets the current state, not historical values.
+
+---
+
+## New Topic: `team_stats`
+
+The `team_stats` topic uses **log compaction**. This is perfect for our use case: tracking the *current* processing statistics per team, not the history of how they changed.
+
+### Team Stats Record Schema
+
+Each time you flag a user, produce a record like this:
 
 ```json
 {
     "team": "team-1",
-    "company": "Breitenberg and Sons",
-    "flag_count": 3
+    "processed": 150,
+    "flagged": 23
 }
 ```
 
-The **key** of the message must be the company name (e.g., `"Breitenberg and Sons"`).
+The **key** of the message must be your team name (e.g., `"team-1"`).
 
 ---
 
 ## TODOs
 
-### 1. Track Companies in Memory
+### 1. Track Stats in Memory
 
-Before you can produce to the watchlist, you need to count how many flagged users belong to each company.
-
-Add a dictionary at the top of your code to track flag counts:
+Add counters at the top of your code to track your processing:
 
 ```python
-# Track how many times each company has been flagged
-company_flags = {}
+# Track processing statistics
+processed_count = 0
+flagged_count = 0
 ```
 
 ---
 
 ### 2. Update Your Processing Loop
 
-When your filter matches (the same condition from Step 2), increment the company's count and check if it reaches the threshold:
+Increment your counters as you process messages:
 
 ```python
-# Inside your message processing loop, after your filter matches:
-company_name = parsed_message["company_name"]
+# Inside your message processing loop:
+processed_count += 1  # Count every message you see
 
-# Increment the count (start at 0 if company not seen before)
-company_flags[company_name] = company_flags.get(company_name, 0) + 1
-
-if company_flags[company_name] >= 3:
-    print(f"ALERT: {company_name} has reached the watchlist with {company_flags[company_name]} flags!")
+# When your filter matches:
+if your_filter_matches:
+    flagged_count += 1
+    
+    # ... produce to actions topic (from Step 3) ...
+    
+    # Now produce stats update
+    stats_record = {
+        "team": TEAM_NAME,
+        "processed": processed_count,
+        "flagged": flagged_count
+    }
+    
+    # The key MUST be your team name (as bytes)
+    producer.send('team_stats',
+                  key=TEAM_NAME.encode('utf-8'),
+                  value=bytes(json.dumps(stats_record), 'utf-8'))
 ```
 
 ---
 
-### 3. Produce to Watchlist with KEY
+### 3. Produce to team_stats with KEY
 
-Now produce to the `watchlist` topic. The key difference from Step 3 is that you **must include a key**:
+The key difference from Step 3 is that you **must include a key**:
 
 ```python
-watchlist_record = {
-    "team": TEAM_NAME,
-    "company": company_name,
-    "flag_count": company_flags[company_name]
-}
-
-# The key MUST be the company name (as bytes)
-producer.send('watchlist',
-              key=company_name.encode('utf-8'),
-              value=bytes(json.dumps(watchlist_record), 'utf-8'))
+producer.send('team_stats',
+              key=TEAM_NAME.encode('utf-8'),           # <- KEY is required!
+              value=bytes(json.dumps(stats_record), 'utf-8'))
 ```
 
-**Important:** The key must be encoded as bytes using `.encode('utf-8')`.
-
-Ask the instructor to check if they can see your watchlist messages!
+**Important:** 
+- The key must be encoded as bytes using `.encode('utf-8')`
+- The key MUST match the `team` field in your JSON value
+- The instructor's dashboard tracks whether you're using keys correctly!
 
 ---
 
-## Why Compaction Works
+## Check Your Work
 
-Consider what happens when you flag the same company multiple times:
+| Leaderboard Shows | Meaning |
+|-------------------|---------|
+| 📊 in Progress | Success! Stats message received |
+| 🔌 📤 ⚖️ 📊 all visible | Tutorial complete! |
 
-```
-Key: "Acme Corp" → Value: {"flag_count": 1}
-Key: "Acme Corp" → Value: {"flag_count": 2}
-Key: "Acme Corp" → Value: {"flag_count": 3}
-```
-
-After compaction runs, only the **latest** record for each key is kept:
-
-```
-Key: "Acme Corp" → Value: {"flag_count": 3}
-```
-
-This means on restart, you only need to read a small number of messages to fully restore your state!
+The instructor's dashboard shows your live stats in a dedicated panel!
 
 ---
 
 ## Questions to Consider
 
-1. What happens if two team members run the same code with the same team name?
-2. Why must the message key match the company name in the value?
-3. What would happen if your process crashes between incrementing the count and producing to Kafka?
+1. What happens if you send a stats message without a key?
+2. Why must the message key match the team name in the value?
+3. What would a new consumer see if they read from the compacted topic from the beginning?
 
 ---
 
 ## Bonus Challenge: State Recovery
 
-What happens if your program crashes and restarts? Your `company_flags` dictionary would be empty, and you'd lose track of previous counts!
+What happens if your program crashes and restarts? Your counters would reset to zero, and you'd lose track of previous progress!
 
-Since the `watchlist` topic is compacted, you can rebuild your state by reading from it on startup. The compacted topic only keeps the latest value per key, so you'll quickly get the current count for each company.
+Since the `team_stats` topic is compacted, you can rebuild your state by reading from it on startup. The compacted topic only keeps the latest value per key, so you'll quickly get the current stats.
 
-**Hint:** Create a second consumer that reads from `watchlist` with `auto_offset_reset='earliest'` before starting your main processing loop. Filter for your team's records and populate `company_flags` before processing new users.
+**Hint:** Create a second consumer that reads from `team_stats` with `auto_offset_reset='earliest'` before starting your main processing loop. Filter for your team's key and populate your counters before processing new users.
+
+```python
+# On startup, restore state from compacted topic
+restore_consumer = KafkaConsumer(
+    'team_stats',
+    bootstrap_servers=BOOTSTRAP_SERVERS,
+    auto_offset_reset='earliest',
+    consumer_timeout_ms=5000,  # Stop after 5 seconds of no messages
+    # ... other auth settings ...
+)
+
+for message in restore_consumer:
+    if message.key and message.key.decode('utf-8') == TEAM_NAME:
+        data = json.loads(message.value.decode('utf-8'))
+        processed_count = data['processed']
+        flagged_count = data['flagged']
+        print(f"Restored state: processed={processed_count}, flagged={flagged_count}")
+
+restore_consumer.close()
+```
 
 This is an advanced challenge - ask your instructor for guidance if you get stuck!
 
@@ -139,7 +219,7 @@ Throughout these 5 steps, you've learned:
 - **Step 2**: How to filter and transform data
 - **Step 3**: How to produce messages to Kafka
 - **Step 4**: How to scale with Consumer Groups
-- **Step 5**: How to build stateful applications with keys and compaction
+- **Step 5**: How to use message keys and log compaction for stateful applications
 
 These are the building blocks for real-world stream processing systems. You're now ready to tackle more advanced Kafka concepts like exactly-once semantics, Kafka Streams, and schema registries.
 
