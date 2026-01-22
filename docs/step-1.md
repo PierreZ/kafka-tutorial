@@ -109,7 +109,7 @@ This is why partition count matters for your application design—and why we'll 
 
 | Leaderboard Shows | Meaning |
 |-------------------|---------|
-| 1️⃣ in Progress | Success! You're connected |
+| 🔌 in Progress | Success! You're connected |
 | Team stays ⬜ | Connection issue - see Troubleshooting |
 
 > **⚔️ First Blood**: The first team to connect wins this achievement! Speed matters.

@@ -19,7 +19,7 @@ Two main components:
 - **Python consumer/producer** (`main.py`): Template code for tutorial participants using `kafka-python`
 - **Rust producer** (`backend/producer/`): Generates fake user data and publishes to Kafka using `rdkafka`
 
-Both connect via SASL_PLAINTEXT with PLAIN mechanism. Local development uses Docker (see `local-dev/`).
+Both connect via SASL_PLAINTEXT with SCRAM-SHA-256 mechanism. Local development uses Docker (see `local-dev/`).
 
 ## Build and Run Commands
 

@@ -8,3 +8,7 @@ main-solution.py
 .venv/
 
 target/
+
+# Config files with credentials (use config.example.toml as template)
+**/config.toml
+!config.example.toml

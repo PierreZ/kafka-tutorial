@@ -88,7 +88,7 @@ if any(kw in user["industry"] for kw in keywords):
 
 ## Check Your Work
 
-Your filter logic runs locally - you'll verify it works in the next step when you produce messages. If 3️⃣ appears on the leaderboard, your filter is matching users correctly!
+Your filter logic runs locally - you'll verify it works in the next step when you produce messages. If 📤 appears on the leaderboard, your filter is matching users correctly!
 
 ---
 
