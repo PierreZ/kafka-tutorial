@@ -4,6 +4,9 @@ use rdkafka::TopicPartitionList;
 use std::time::Duration;
 use tracing::{debug, warn};
 
+/// Timeout for Kafka admin operations (reduced for faster recovery)
+const ADMIN_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Map rdkafka group state string to our GroupState enum
 fn map_group_state(state: &str) -> GroupState {
     match state.to_lowercase().as_str() {
@@ -14,99 +17,167 @@ fn map_group_state(state: &str) -> GroupState {
     }
 }
 
-/// Fetch consumer group status for all teams using real Kafka group list
-pub async fn fetch_consumer_group_statuses(
+/// Create a BaseConsumer for admin operations
+fn create_admin_consumer(
     brokers: &str,
     username: &str,
     password: &str,
     security_protocol: &str,
     sasl_mechanism: &str,
-) -> Vec<ConsumerGroupStatus> {
-    // Create a consumer to fetch group list
-    let consumer: BaseConsumer = match kafka_common::kafka::new_sasl_config(
+    group_id: &str,
+) -> Result<BaseConsumer, rdkafka::error::KafkaError> {
+    kafka_common::kafka::new_sasl_config(brokers, username, password, security_protocol, sasl_mechanism)
+        .set("group.id", group_id)
+        .create()
+}
+
+/// Fetch consumer group status for a single team (async-safe)
+///
+/// Wraps the blocking rdkafka calls in spawn_blocking to avoid blocking the async runtime.
+pub async fn fetch_single_group_status_async(
+    brokers: &str,
+    username: &str,
+    password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
+    team_name: &str,
+) -> ConsumerGroupStatus {
+    let brokers = brokers.to_string();
+    let username = username.to_string();
+    let password = password.to_string();
+    let security_protocol = security_protocol.to_string();
+    let sasl_mechanism = sasl_mechanism.to_string();
+    let team_name = team_name.to_string();
+
+    let team_name_for_error = team_name.clone();
+
+    tokio::task::spawn_blocking(move || {
+        fetch_single_group_status_sync(
+            &brokers,
+            &username,
+            &password,
+            &security_protocol,
+            &sasl_mechanism,
+            &team_name,
+        )
+    })
+    .await
+    .unwrap_or_else(|e| {
+        warn!("spawn_blocking failed for {}: {:?}", team_name_for_error, e);
+        ConsumerGroupStatus {
+            team_name: team_name_for_error,
+            state: GroupState::Unknown,
+            members: 0,
+            lag: 0,
+        }
+    })
+}
+
+/// Fetch consumer group status for a single team (blocking)
+fn fetch_single_group_status_sync(
+    brokers: &str,
+    username: &str,
+    password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
+    team_name: &str,
+) -> ConsumerGroupStatus {
+    let consumer: BaseConsumer = match create_admin_consumer(
         brokers,
         username,
         password,
         security_protocol,
         sasl_mechanism,
-    )
-    .set("group.id", "leaderboard-group-monitor")
-    .create()
-    {
+        "leaderboard-group-monitor",
+    ) {
         Ok(c) => c,
         Err(e) => {
-            warn!("Failed to create consumer for group monitoring: {:?}", e);
-            return fallback_empty_statuses();
+            debug!("Failed to create consumer for {}: {:?}", team_name, e);
+            return ConsumerGroupStatus {
+                team_name: team_name.to_string(),
+                state: GroupState::Unknown,
+                members: 0,
+                lag: 0,
+            };
         }
     };
 
-    // Fetch all consumer groups
-    match consumer.fetch_group_list(None, Duration::from_secs(5)) {
+    // Fetch group list filtered to this team
+    match consumer.fetch_group_list(Some(team_name), ADMIN_TIMEOUT) {
         Ok(group_list) => {
-            let mut statuses: Vec<ConsumerGroupStatus> = group_list
-                .groups()
-                .iter()
-                .filter(|g| g.name().starts_with("team-"))
-                .map(|g| ConsumerGroupStatus {
-                    team_name: g.name().to_string(),
-                    state: map_group_state(g.state()),
-                    members: g.members().len() as u32,
+            // Find this specific group
+            if let Some(group) = group_list.groups().iter().find(|g| g.name() == team_name) {
+                ConsumerGroupStatus {
+                    team_name: team_name.to_string(),
+                    state: map_group_state(group.state()),
+                    members: group.members().len() as u32,
                     lag: 0, // Lag is calculated separately
-                })
-                .collect();
-
-            // Ensure all teams are represented (add missing ones as Unknown)
-            for i in 1..=crate::NUM_TEAMS {
-                let team_name = format!("team-{}", i);
-                if !statuses.iter().any(|s| s.team_name == team_name) {
-                    statuses.push(ConsumerGroupStatus {
-                        team_name,
-                        state: GroupState::Unknown,
-                        members: 0,
-                        lag: 0,
-                    });
+                }
+            } else {
+                // Group doesn't exist yet
+                ConsumerGroupStatus {
+                    team_name: team_name.to_string(),
+                    state: GroupState::Unknown,
+                    members: 0,
+                    lag: 0,
                 }
             }
-
-            // Sort by team number for consistent ordering
-            statuses.sort_by(|a, b| {
-                let a_num: u32 = a
-                    .team_name
-                    .strip_prefix("team-")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                let b_num: u32 = b
-                    .team_name
-                    .strip_prefix("team-")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                a_num.cmp(&b_num)
-            });
-
-            statuses
         }
         Err(e) => {
-            warn!("Failed to fetch group list: {:?}", e);
-            fallback_empty_statuses()
+            debug!("Failed to fetch group {} status: {:?}", team_name, e);
+            ConsumerGroupStatus {
+                team_name: team_name.to_string(),
+                state: GroupState::Unknown,
+                members: 0,
+                lag: 0,
+            }
         }
     }
 }
 
-/// Return empty statuses for all teams as fallback
-fn fallback_empty_statuses() -> Vec<ConsumerGroupStatus> {
-    (1..=crate::NUM_TEAMS)
-        .map(|i| ConsumerGroupStatus {
-            team_name: format!("team-{}", i),
-            state: GroupState::Unknown,
-            members: 0,
-            lag: 0,
-        })
-        .collect()
+/// Fetch consumer group lag for a single team (async-safe)
+///
+/// Wraps the blocking rdkafka calls in spawn_blocking to avoid blocking the async runtime.
+pub async fn fetch_consumer_group_lag_async(
+    brokers: &str,
+    username: &str,
+    password: &str,
+    security_protocol: &str,
+    sasl_mechanism: &str,
+    group_id: &str,
+    topic: &str,
+) -> Option<i64> {
+    let brokers = brokers.to_string();
+    let username = username.to_string();
+    let password = password.to_string();
+    let security_protocol = security_protocol.to_string();
+    let sasl_mechanism = sasl_mechanism.to_string();
+    let group_id = group_id.to_string();
+    let topic = topic.to_string();
+
+    let group_id_for_error = group_id.clone();
+
+    tokio::task::spawn_blocking(move || {
+        fetch_consumer_group_lag_sync(
+            &brokers,
+            &username,
+            &password,
+            &security_protocol,
+            &sasl_mechanism,
+            &group_id,
+            &topic,
+        )
+    })
+    .await
+    .unwrap_or_else(|e| {
+        warn!("spawn_blocking failed for lag check {}: {:?}", group_id_for_error, e);
+        None
+    })
 }
 
-/// Fetch committed offsets for a consumer group and calculate lag
+/// Fetch committed offsets for a consumer group and calculate lag (blocking)
 /// Returns total lag across all partitions, or None if failed
-pub fn fetch_consumer_group_lag(
+fn fetch_consumer_group_lag_sync(
     brokers: &str,
     username: &str,
     password: &str,
@@ -116,30 +187,23 @@ pub fn fetch_consumer_group_lag(
     topic: &str,
 ) -> Option<i64> {
     // Create a consumer with the target group to fetch committed offsets
-    let consumer: BaseConsumer = match kafka_common::kafka::new_sasl_config(
+    let consumer: BaseConsumer = match create_admin_consumer(
         brokers,
         username,
         password,
         security_protocol,
         sasl_mechanism,
-    )
-    .set("group.id", group_id)
-    .create()
-    {
+        group_id,
+    ) {
         Ok(c) => c,
         Err(e) => {
-            debug!(
-                "Failed to create consumer for lag check {}: {:?}",
-                group_id, e
-            );
+            debug!("Failed to create consumer for lag check {}: {:?}", group_id, e);
             return None;
         }
     };
 
-    let timeout = Duration::from_secs(5);
-
     // Get topic metadata to find partitions
-    let metadata = match consumer.fetch_metadata(Some(topic), timeout) {
+    let metadata = match consumer.fetch_metadata(Some(topic), ADMIN_TIMEOUT) {
         Ok(m) => m,
         Err(e) => {
             debug!("Failed to fetch metadata for {}: {:?}", topic, e);
@@ -165,13 +229,10 @@ pub fn fetch_consumer_group_lag(
     }
 
     // Get committed offsets for this consumer group
-    let committed = match consumer.committed_offsets(tpl, timeout) {
+    let committed = match consumer.committed_offsets(tpl, ADMIN_TIMEOUT) {
         Ok(c) => c,
         Err(e) => {
-            debug!(
-                "Failed to fetch committed offsets for {}: {:?}",
-                group_id, e
-            );
+            debug!("Failed to fetch committed offsets for {}: {:?}", group_id, e);
             return None;
         }
     };
@@ -180,7 +241,7 @@ pub fn fetch_consumer_group_lag(
     let mut total_lag: i64 = 0;
     for partition in &partitions {
         // Get high watermark for this partition
-        let (_, high) = match consumer.fetch_watermarks(topic, *partition, timeout) {
+        let (_, high) = match consumer.fetch_watermarks(topic, *partition, ADMIN_TIMEOUT) {
             Ok(w) => w,
             Err(_) => continue,
         };

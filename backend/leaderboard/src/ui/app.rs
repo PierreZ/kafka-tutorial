@@ -207,20 +207,17 @@ pub async fn run(settings: Settings) -> Result<()> {
         }
     });
 
-    // Spawn admin monitoring task
-    let settings_clone = settings.clone();
-    let state_clone = state.clone();
-    let producer_clone = producer.clone();
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) =
-                monitor_consumer_groups(&settings_clone, &state_clone, &producer_clone).await
-            {
-                warn!("Admin monitoring error: {:?}", e);
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    });
+    // Spawn per-team monitoring tasks (one independent task per team)
+    for team_num in 1..=NUM_TEAMS {
+        let team_name = format!("team-{}", team_num);
+        let settings_clone = settings.clone();
+        let state_clone = state.clone();
+        let producer_clone = producer.clone();
+
+        tokio::spawn(async move {
+            monitor_single_team(team_name, settings_clone, state_clone, producer_clone).await;
+        });
+    }
 
     // Run TUI
     run_tui(state, settings).await
@@ -358,16 +355,30 @@ async fn run_app(
     ui_state: &mut UiState,
     settings: &Settings,
 ) -> Result<()> {
+    // Cache state snapshot for non-blocking rendering
+    let mut cached_state: Option<AppState> = None;
+
     loop {
-        // Draw
-        {
-            let app_state = state.read().await;
+        // Try to get latest state without blocking (non-blocking for smooth UI)
+        if let Ok(app_state) = state.try_read() {
             ui_state.sorted_teams = leaderboard_table::get_sorted_teams(&app_state.teams);
-            terminal.draw(|f| draw_ui(f, &app_state, ui_state, settings))?;
+            cached_state = Some(AppState {
+                teams: app_state.teams.clone(),
+                consumer_counts: app_state.consumer_counts.clone(),
+                group_states: app_state.group_states.clone(),
+                celebrations: app_state.celebrations.clone(),
+                session_start: app_state.session_start,
+                last_data_update: app_state.last_data_update,
+            });
         }
 
-        // Handle events with timeout for refresh
-        if event::poll(Duration::from_millis(100))? {
+        // Draw using cached state
+        if let Some(ref app_state) = cached_state {
+            terminal.draw(|f| draw_ui(f, app_state, ui_state, settings))?;
+        }
+
+        // Handle events with timeout for refresh (~60 FPS)
+        if event::poll(Duration::from_millis(16))? {
             if let Event::Key(key) = event::read()? {
                 let max_rows = ui_state.sorted_teams.len();
 
@@ -688,85 +699,100 @@ async fn consume_team_stats(
     Ok(())
 }
 
-/// Monitor consumer groups for connection and scaling achievements
-async fn monitor_consumer_groups(
-    settings: &Settings,
-    state: &Arc<RwLock<AppState>>,
-    producer: &Arc<FutureProducer>,
-) -> Result<()> {
-    // Fetch all consumer group statuses at once
-    let statuses = admin::fetch_consumer_group_statuses(
-        &settings.kafka.brokers,
-        &settings.kafka.username,
-        &settings.kafka.password,
-        &settings.kafka.security_protocol,
-        &settings.kafka.sasl_mechanism,
-    )
-    .await;
+/// Monitor a single team's consumer group (runs as independent task)
+async fn monitor_single_team(
+    team_name: String,
+    settings: Settings,
+    state: Arc<RwLock<AppState>>,
+    producer: Arc<FutureProducer>,
+) {
+    info!("Starting monitoring task for {}", team_name);
 
-    for status in statuses {
-        let team_name = status.team_name.clone();
-
-        let mut app_state = state.write().await;
-        app_state
-            .consumer_counts
-            .insert(team_name.clone(), status.members);
-        app_state
-            .group_states
-            .insert(team_name.clone(), status.state.clone());
-        app_state.last_data_update = Some(Instant::now());
-
-        // Collect achievements to celebrate (avoid borrow issues)
-        let mut celebrations = Vec::new();
-        let mut should_persist = false;
-
-        if let Some(team) = app_state.teams.get_mut(&team_name) {
-            // Fetch actual lag from consumer group committed offsets
-            if let Some(lag) = admin::fetch_consumer_group_lag(
-                &settings.kafka.brokers,
-                &settings.kafka.username,
-                &settings.kafka.password,
-                &settings.kafka.security_protocol,
-                &settings.kafka.sasl_mechanism,
-                &team_name,
-                &settings.topics.new_users,
-            ) {
-                team.update_lag(lag);
-            }
-
-            // Check Connected achievement
-            if status.state == GroupState::Active
-                && team.unlock_achievement(AchievementType::Connected)
-            {
-                celebrations.push(AchievementType::Connected);
-                should_persist = true;
-            }
-
-            // Check Scaled achievement
-            if status.members >= settings.achievements.scaled_members
-                && team.unlock_achievement(AchievementType::Scaled)
-            {
-                celebrations.push(AchievementType::Scaled);
-                should_persist = true;
-            }
+    loop {
+        // Update last_data_update at start of cycle to show we're actively monitoring
+        {
+            let mut app_state = state.write().await;
+            app_state.last_data_update = Some(Instant::now());
         }
 
-        // Add celebrations
-        for achievement in &celebrations {
-            app_state.add_celebration(team_name.clone(), *achievement);
-        }
+        // Fetch this team's consumer group status (async-safe, won't block runtime)
+        let status = admin::fetch_single_group_status_async(
+            &settings.kafka.brokers,
+            &settings.kafka.username,
+            &settings.kafka.password,
+            &settings.kafka.security_protocol,
+            &settings.kafka.sasl_mechanism,
+            &team_name,
+        )
+        .await;
 
-        // Persist if needed
-        if should_persist {
-            if let Some(team) = app_state.teams.get(&team_name) {
-                let team_clone = team.clone();
-                let scorer_topic = settings.topics.scorer_state.clone();
-                drop(app_state);
+        // Fetch lag for this team (async-safe)
+        let lag = admin::fetch_consumer_group_lag_async(
+            &settings.kafka.brokers,
+            &settings.kafka.username,
+            &settings.kafka.password,
+            &settings.kafka.security_protocol,
+            &settings.kafka.sasl_mechanism,
+            &team_name,
+            &settings.topics.new_users,
+        )
+        .await;
 
-                let _ = persistence::persist_state(producer, &scorer_topic, &team_clone).await;
+        // Update shared state (scoped to release lock before sleep)
+        let persist_data: Option<(TeamState, String)> = {
+            let mut app_state = state.write().await;
+            app_state
+                .consumer_counts
+                .insert(team_name.clone(), status.members);
+            app_state
+                .group_states
+                .insert(team_name.clone(), status.state.clone());
+
+            let mut celebrations = Vec::new();
+
+            if let Some(team) = app_state.teams.get_mut(&team_name) {
+                // Update lag if we got it
+                if let Some(lag_value) = lag {
+                    team.update_lag(lag_value);
+                }
+
+                // Check Connected achievement
+                if status.state == GroupState::Active
+                    && team.unlock_achievement(AchievementType::Connected)
+                {
+                    celebrations.push(AchievementType::Connected);
+                }
+
+                // Check Scaled achievement
+                if status.members >= settings.achievements.scaled_members
+                    && team.unlock_achievement(AchievementType::Scaled)
+                {
+                    celebrations.push(AchievementType::Scaled);
+                }
             }
+
+            // Add celebrations
+            for achievement in &celebrations {
+                app_state.add_celebration(team_name.clone(), *achievement);
+            }
+
+            // Collect data for persistence outside the lock
+            if !celebrations.is_empty() {
+                app_state
+                    .teams
+                    .get(&team_name)
+                    .map(|team| (team.clone(), settings.topics.scorer_state.clone()))
+            } else {
+                None
+            }
+        }; // Lock released here
+
+        // Persist outside the lock
+        if let Some((team_clone, scorer_topic)) = persist_data {
+            let _ = persistence::persist_state(&producer, &scorer_topic, &team_clone).await;
         }
+
+        // Sleep before next check
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
-
-    Ok(())
 }
