@@ -15,27 +15,27 @@ Think of it like a team splitting up work: if you have 3 partitions and 2 team m
 Your consumer's `group_id` (e.g., `"team-1"`) identifies which Consumer Group it belongs to. All consumers with the same `group_id` are part of the same group and share the workload.
 
 ```
-                    Topic: new_users (3 partitions)
-                    ┌───────┐ ┌───────┐ ┌───────┐
-                    │  P0   │ │  P1   │ │  P2   │
-                    └───┬───┘ └───┬───┘ └───┬───┘
-                        │        │        │
-    ┌───────────────────┼────────┼────────┼───────────────────┐
-    │                   ▼        ▼        ▼                   │
-    │  Consumer Group: team-1                                 │
-    │                                                         │
-    │  With 1 consumer:                                       │
-    │  ┌─────────────────────────────────────┐               │
-    │  │     Consumer A (your laptop)        │               │
-    │  │        reads P0, P1, P2             │               │
-    │  └─────────────────────────────────────┘               │
-    │                                                         │
-    │  With 2 consumers (after colleague joins):              │
-    │  ┌─────────────────┐  ┌─────────────────┐              │
-    │  │   Consumer A    │  │   Consumer B    │              │
-    │  │   reads P0, P1  │  │    reads P2     │              │
-    │  └─────────────────┘  └─────────────────┘              │
-    └─────────────────────────────────────────────────────────┘
+                    Topic: new_users (5 partitions)
+            ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐
+            │  P0   │ │  P1   │ │  P2   │ │  P3   │ │  P4   │
+            └───┬───┘ └───┬───┘ └───┬───┘ └───┬───┘ └───┬───┘
+                │        │        │        │        │
+    ┌───────────┼────────┼────────┼────────┼────────┼─────────────┐
+    │           ▼        ▼        ▼        ▼        ▼             │
+    │  Consumer Group: team-1                                     │
+    │                                                             │
+    │  With 1 consumer:                                           │
+    │  ┌───────────────────────────────────────────┐             │
+    │  │         Consumer A (your laptop)          │             │
+    │  │          reads P0, P1, P2, P3, P4         │             │
+    │  └───────────────────────────────────────────┘             │
+    │                                                             │
+    │  With 2 consumers (after colleague joins):                  │
+    │  ┌─────────────────────┐  ┌─────────────────────┐          │
+    │  │     Consumer A      │  │     Consumer B      │          │
+    │  │   reads P0, P1, P2  │  │    reads P3, P4     │          │
+    │  └─────────────────────┘  └─────────────────────┘          │
+    └─────────────────────────────────────────────────────────────┘
 ```
 
 ### What is Rebalancing?
@@ -65,6 +65,8 @@ Consumer Group: team-1
 │     P0      │       142        │  ← Last processed message
 │     P1      │       98         │
 │     P2      │       201        │
+│     P3      │       67         │
+│     P4      │       189        │
 └─────────────┴──────────────────┘
 ```
 
@@ -76,10 +78,11 @@ You **cannot have more active consumers than partitions**. If you have 3 partiti
 
 | Consumers | Partition Assignment | Notes |
 |-----------|---------------------|-------|
-| 1 | A: P0, P1, P2 | One consumer handles everything |
-| 2 | A: P0, P1  B: P2 | Work is split |
-| 3 | A: P0  B: P1  C: P2 | Maximum parallelism |
-| 4 | A: P0  B: P1  C: P2  D: (idle) | Extra consumer is wasted! |
+| 1 | A: P0, P1, P2, P3, P4 | One consumer handles everything |
+| 2 | A: P0, P1, P2  B: P3, P4 | Work is split (3+2) |
+| 3 | A: P0, P1  B: P2, P3  C: P4 | Better distribution (2+2+1) |
+| 5 | A: P0  B: P1  C: P2  D: P3  E: P4 | Maximum parallelism |
+| 6 | A: P0  B: P1  C: P2  D: P3  E: P4  F: (idle) | Extra consumer is wasted! |
 
 This is why partition count is an important decision when creating topics.
 

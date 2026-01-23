@@ -63,19 +63,18 @@ Each topic is split into one or more **partitions**. A partition is an ordered, 
 
 ```
 Topic: new_users
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  Partition 0         Partition 1         Partition 2        │
-│  ┌───────────┐       ┌───────────┐       ┌───────────┐     │
-│  │ offset 0  │       │ offset 0  │       │ offset 0  │     │
-│  │ offset 1  │       │ offset 1  │       │ offset 1  │     │
-│  │ offset 2  │       │ offset 2  │       │ offset 2  │     │
-│  │ offset 3  │       │    ...    │       │    ...    │     │
-│  │    ...    │       │           │       │           │     │
-│  └───────────┘       └───────────┘       └───────────┘     │
-│       ▲                   ▲                   ▲             │
-│   append here         append here         append here       │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                       │
+│  Partition 0    Partition 1    Partition 2    Partition 3    Partition 4             │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐            │
+│  │ offset 0 │   │ offset 0 │   │ offset 0 │   │ offset 0 │   │ offset 0 │            │
+│  │ offset 1 │   │ offset 1 │   │ offset 1 │   │ offset 1 │   │ offset 1 │            │
+│  │ offset 2 │   │ offset 2 │   │ offset 2 │   │ offset 2 │   │ offset 2 │            │
+│  │   ...    │   │   ...    │   │   ...    │   │   ...    │   │   ...    │            │
+│  └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘            │
+│       ▲              ▲              ▲              ▲              ▲                   │
+│   append here    append here   append here    append here    append here             │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Why partitions?**

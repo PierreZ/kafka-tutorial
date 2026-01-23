@@ -26,16 +26,16 @@ Keys serve two important purposes:
 2. **Log Compaction**: When enabled, Kafka keeps only the **latest** value for each key—perfect for maintaining current state.
 
 ```
-Without key:                      With key:
-Messages go to random partitions  Same key → same partition
-┌────┐ ┌────┐ ┌────┐              ┌────┐ ┌────┐ ┌────┐
-│ P0 │ │ P1 │ │ P2 │              │ P0 │ │ P1 │ │ P2 │
-├────┤ ├────┤ ├────┤              ├────┤ ├────┤ ├────┤
-│ A  │ │ B  │ │ A  │  ← scattered │ A  │ │ B  │ │ C  │
-│ C  │ │ A  │ │ B  │              │ A  │ │ B  │ │ C  │
-│ B  │ │ C  │ │ C  │              │ A  │ │ B  │ │ C  │
-└────┘ └────┘ └────┘              └────┘ └────┘ └────┘
-                                       ↑ All "A" messages together
+Without key:                                With key:
+Messages go to random partitions            Same key → same partition
+┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐         ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐
+│ P0 │ │ P1 │ │ P2 │ │ P3 │ │ P4 │         │ P0 │ │ P1 │ │ P2 │ │ P3 │ │ P4 │
+├────┤ ├────┤ ├────┤ ├────┤ ├────┤         ├────┤ ├────┤ ├────┤ ├────┤ ├────┤
+│ A  │ │ B  │ │ A  │ │ C  │ │ B  │ ← rand  │ A  │ │ B  │ │ C  │ │ D  │ │ E  │
+│ C  │ │ A  │ │ B  │ │ A  │ │ C  │         │ A  │ │ B  │ │ C  │ │ D  │ │ E  │
+│ B  │ │ C  │ │ C  │ │ B  │ │ A  │         │ A  │ │ B  │ │ C  │ │ D  │ │ E  │
+└────┘ └────┘ └────┘ └────┘ └────┘         └────┘ └────┘ └────┘ └────┘ └────┘
+                                                 ↑ All "A" messages together
 ```
 
 ---

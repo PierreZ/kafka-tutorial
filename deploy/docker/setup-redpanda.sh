@@ -64,20 +64,20 @@ docker exec "$CONTAINER_NAME" rpk security user create team-admin \
 echo ""
 echo "=== Creating Topics ==="
 docker exec "$CONTAINER_NAME" rpk topic create new_users \
-    --partitions 2 \
+    --partitions 5 \
     --replicas 1 \
     --topic-config retention.ms=3600000 \
     $AUTH_FLAGS 2>/dev/null || echo "Topic new_users may already exist"
 
 docker exec "$CONTAINER_NAME" rpk topic create actions \
-    --partitions 2 \
+    --partitions 5 \
     --replicas 1 \
     --topic-config retention.ms=3600000 \
     $AUTH_FLAGS 2>/dev/null || echo "Topic actions may already exist"
 
 # Create log-compacted topics
 docker exec "$CONTAINER_NAME" rpk topic create team_stats \
-    --partitions 2 \
+    --partitions 5 \
     --replicas 1 \
     --topic-config cleanup.policy=compact \
     --topic-config segment.ms=60000 \
