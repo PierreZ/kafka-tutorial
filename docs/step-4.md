@@ -72,6 +72,25 @@ Consumer Group: team-1
 
 When a consumer (re)starts, it asks: "What was the last offset I committed for each partition?" and resumes from there.
 
+### Where Are Offsets Stored?
+
+Kafka stores committed offsets in a special internal topic called `__consumer_offsets`. This is a compacted topic (see Step 5) that keeps the latest offset for each `(group_id, topic, partition)` combination.
+
+**How offset commits work:**
+
+1. Your consumer processes messages (e.g., offsets 0-9)
+2. By default, `kafka-python` **auto-commits** every 5 seconds
+3. The committed offset is written to `__consumer_offsets`
+4. If your consumer crashes and restarts, it reads from `__consumer_offsets` to find where it left off
+
+**What this means for your application:**
+
+- **Messages may be reprocessed**: If your consumer crashes between processing a message and the next auto-commit, those messages will be redelivered
+- **At-least-once delivery**: Kafka guarantees you'll see every message at least once, but possibly more than once
+- **Design for idempotency**: Your processing logic should handle duplicate messages gracefully
+
+> **Note:** You can disable auto-commit and manually commit offsets for finer control, but that's beyond this tutorial's scope.
+
 ### Key Insight: Max Parallelism = Partition Count
 
 You **cannot have more active consumers than partitions**. If you have 3 partitions and 4 consumers, one consumer will sit idle with nothing to read.

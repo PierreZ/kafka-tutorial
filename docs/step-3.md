@@ -74,6 +74,46 @@ For this tutorial, calling `.get()` on each message helps you see immediate feed
 
 For more details, refer to the [KafkaProducer guide](https://kafka-python.readthedocs.io/en/master/usage.html#kafkaproducer).
 
+### Why Async Matters
+
+**Synchronous (blocking):** If we waited for Kafka's acknowledgment on every message, network latency would limit us to ~100 messages/second:
+
+```
+Send message → Wait 10ms → Send next message → Wait 10ms → ...
+```
+
+**Asynchronous (non-blocking):** By queuing messages and sending them in batches, we can achieve 100,000+ messages/second:
+
+```
+Queue msg1, msg2, msg3... → Send batch → Queue more while waiting → ...
+```
+
+### The Future Object
+
+A `Future` represents a value that **will be available later**. It's a common pattern in async programming:
+
+```python
+# .send() returns immediately with a Future (the message isn't sent yet)
+future = producer.send('topic', value=message)
+
+# Do other work here while the message sends in the background...
+
+# When you need the result, call .get() - this blocks until delivery
+try:
+    result = future.get(timeout=10)
+    print(f"Delivered to {result.topic}:{result.partition}:{result.offset}")
+except Exception as e:
+    print(f"Delivery failed: {e}")
+```
+
+### Choosing Your Strategy
+
+| Method | Behavior | Use When |
+|--------|----------|----------|
+| `.get()` on each send | Blocks per message | Debugging, low volume |
+| `.flush()` at end | Blocks once, sends all | End of batch processing |
+| Callbacks | Never blocks | High-throughput production |
+
 ---
 
 ## Check Your Work

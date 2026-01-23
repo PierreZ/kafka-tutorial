@@ -77,6 +77,25 @@ BEFORE COMPACTION:                      AFTER COMPACTION:
 
 3. **Always Current**: Any new consumer reading from the beginning gets the current state, not historical values.
 
+### When Does Compaction Happen?
+
+Compaction runs **in the background** on the Kafka broker, not immediately after each message. Important timing details:
+
+| Aspect | Behavior |
+|--------|----------|
+| **Trigger** | Kafka compacts when the ratio of "dirty" (uncompacted) data exceeds a threshold |
+| **Segments** | Only **closed** log segments are compacted—the active segment (where new writes go) is never compacted |
+| **Delay** | There's always some lag before old values are removed |
+
+**What this means for you:**
+
+- Right after producing, you'll see *both* old and new values for the same key
+- After compaction runs, only the latest value remains
+- For real-time dashboards: read from the **end** of the topic for current values
+- For state recovery: read from the **beginning**—compaction ensures you get current state efficiently
+
+> **Note:** Compaction is about storage efficiency and state recovery, not real-time deduplication. Your dashboard reads the latest values regardless of whether compaction has run.
+
 ---
 
 ## New Topic: `team_stats`

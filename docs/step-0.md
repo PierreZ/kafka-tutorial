@@ -8,6 +8,37 @@ Each new registration is sent to Kafka, and your task is to handle various small
 
 ---
 
+## What is Apache Kafka?
+
+Apache Kafka is a **distributed streaming platform**. Think of it as a highly scalable message queue that:
+
+- **Stores** messages durably on disk (messages aren't lost if a server restarts)
+- **Distributes** messages across multiple servers for reliability and performance
+- **Delivers** messages to consumers in order (within a partition)
+
+### Key Vocabulary
+
+| Term | Definition |
+|------|------------|
+| **Broker** | A Kafka server that stores and serves messages |
+| **Cluster** | Multiple brokers working together as one system |
+| **Topic** | A named category/feed of messages (like a database table) |
+| **Partition** | A subset of a topic that enables parallel processing |
+| **Offset** | A message's sequential position within a partition (0, 1, 2, ...) |
+| **Consumer Group** | A set of consumers that share the work of reading a topic |
+| **Producer** | An application that writes messages to Kafka |
+| **Consumer** | An application that reads messages from Kafka |
+
+### Why Kafka?
+
+Traditional message queues delete messages after delivery. Kafka **retains messages** for a configurable period, allowing:
+
+- Multiple consumers to read the same messages independently
+- Consumers to "replay" old messages if needed
+- Fault tolerance - if your app crashes, it resumes where it left off
+
+---
+
 ## Architecture
 
 Each team will develop an application that follows a common pattern known as **ETL** (Extract, Transform, Load):

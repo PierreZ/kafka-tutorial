@@ -64,6 +64,39 @@ if any(kw in user["industry"] for kw in keywords):
 
 ---
 
+## Handling Missing or Invalid Data
+
+Real-world data is messy. While our tutorial producer sends well-formed JSON, production systems should always handle potential errors:
+
+```python
+for message in consumer:
+    try:
+        user = json.loads(message.value.decode('utf-8'))
+
+        # Use .get() with defaults for safer field access
+        industry = user.get('industry', '').lower()  # Returns '' if field missing
+
+        if 'tech' in industry:
+            process_user(user)
+
+    except json.JSONDecodeError:
+        print(f"Invalid JSON: {message.value}")
+    except KeyError as e:
+        print(f"Missing required field: {e}")
+```
+
+### Key Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| `user.get('field', '')` | Optional fields - returns default if missing |
+| `user['field']` | Required fields - raises KeyError if missing |
+| `try/except` | Catches malformed messages without crashing |
+
+> **Note:** For this tutorial, the data is always valid. But building these habits early will save you debugging time in production!
+
+---
+
 ## Team's Criteria
 
 | Team | Field | Condition | type | reason |

@@ -128,6 +128,26 @@ parsed_message = json.loads(message.value.decode('utf-8'))
 print(parsed_message["email"])
 ```
 
+### Understanding Bytes vs Strings
+
+Why do we need `.decode('utf-8')`? Let's break it down:
+
+```python
+# Kafka transmits raw bytes over the network, not text
+raw_bytes = message.value          # b'{"email": "alice@example.com"}'
+
+# .decode() converts bytes to a Python string using UTF-8 encoding
+json_string = raw_bytes.decode('utf-8')  # '{"email": "alice@example.com"}'
+
+# json.loads() converts the JSON string to a Python dictionary
+user = json.loads(json_string)     # {"email": "alice@example.com"}
+
+# Now you can access fields
+print(user["email"])               # alice@example.com
+```
+
+**Why bytes?** Kafka is language-agnostic—it doesn't know if you're using Python, Java, or Go. Bytes are the universal format that all languages understand. UTF-8 is the standard encoding that maps characters (like `a`, `é`, `日`) to bytes.
+
 ---
 
 ## Troubleshooting
