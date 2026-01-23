@@ -33,7 +33,7 @@ The main topic is named "new_users". Here's an example of the JSON pushed:
 ### Step 1: Read Kafka Messages
 With your environment set up (see Step 0), the boilerplate code in `main.py` is ready for you to begin. 
 
-1. Replace the placeholders `BOOTSTRAP_SERVERS`, `TEAM_NAME`, `SASL_USERNAME`, and `SASL_PASSWORD` with the appropriate values in the code.
+1. Replace `TEAM_NAME` with your assigned team name (e.g., `team-2`, `team-3`, etc.). The other credentials are auto-configured.
 2. Run the code. If everything is configured correctly, you should see the Kafka messages being displayed in the output.
 
 #### Questions:

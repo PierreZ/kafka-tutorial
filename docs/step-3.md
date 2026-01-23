@@ -10,9 +10,9 @@ To produce messages, you’ll need to create a [KafkaProducer](https://kafka-pyt
 **Required Parameters for the Producer:**
 - `security_protocol`: `SASL_PLAINTEXT`
 - `sasl_mechanism`: `SCRAM-SHA-256`
-- `sasl_plain_username`: Your team name (e.g., `"team-1"`)
-- `sasl_plain_password`: Ask your instructor
-- `bootstrap_servers`: Ask your instructor
+- `sasl_plain_username`: `SASL_USERNAME` (same as consumer)
+- `sasl_plain_password`: `SASL_PASSWORD` (same as consumer)
+- `bootstrap_servers`: `BOOTSTRAP_SERVERS` (same as consumer)
 - `client_id`: Your team ID
 
 ---
